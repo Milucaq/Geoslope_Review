@@ -9,7 +9,12 @@ from gsreview.presentation.views import NAV
 def test_initial_setup_totp_dashboard_and_logout(tmp_path, monkeypatch):
     monkeypatch.setenv("GEOSLOPE_RUNTIME", str(tmp_path))
     appfile = __import__("pathlib").Path(__file__).resolve().parents[1] / "app.py"
+    setup_key = "ClaveTemporalSoloParaPruebas2026!"
+    monkeypatch.setenv("GEOSLOPE_SETUP_KEY", setup_key)
     at = AppTest.from_file(str(appfile), default_timeout=15).run()
+    assert not at.error and not at.exception
+    at.text_input(key="setup_key").set_value(setup_key)
+    at.run()
     assert not at.error and not at.exception
     password = "Gs!" + secrets.token_hex(12)
     at.text_input(key="setup_username").set_value("sampleadmin")

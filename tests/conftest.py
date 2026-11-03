@@ -10,14 +10,16 @@ from gsreview.application.container import Container
 
 
 @pytest.fixture
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
     clock = [time.time() + 60]
     c = Container(runtime=tmp_path, clock=lambda: clock[0])
     c.test_clock = clock
     c.test_password = "Gs!" + secrets.token_hex(12)
     c.test_temporary = "Tmp!" + secrets.token_hex(12)
     c.test_permanent = "Next!" + secrets.token_hex(12)
-    challenge = c.auth.bootstrap("testadmin", "Administrador sintético", c.test_password)
+    setup_key = "ClaveTemporalSoloParaPruebas2026!"
+    monkeypatch.setenv("GEOSLOPE_SETUP_KEY", setup_key)
+    challenge = c.auth.bootstrap("testadmin", "Administrador sintético", c.test_password, setup_key=setup_key)
     _, secret = c.auth.enrollment(challenge)
     token, codes = c.auth.second_step(challenge, pyotp.TOTP(secret).at(clock[0]), enroll=True)
     c.test_admin, c.test_secret, c.test_codes = token, secret, codes

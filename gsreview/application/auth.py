@@ -93,7 +93,18 @@ class AuthService:
         )
         return user_id
 
-    def bootstrap(self, username, display_name, password):
+    def bootstrap(self, username, display_name, password, setup_key=None):
+        import os
+        import hmac
+
+        expected_key = os.environ.get("GEOSLOPE_SETUP_KEY", "")
+
+        if not expected_key:
+            raise AccessDenied("La clave de instalación no está configurada.")
+
+        if not setup_key or not hmac.compare_digest(setup_key, expected_key):
+            raise AccessDenied("Clave de instalación incorrecta.")
+
         with self.store.tx() as c:
             if c.scalar(select(func.count()).select_from(db.users)):
                 raise AccessDenied("La configuración inicial ya fue realizada.")

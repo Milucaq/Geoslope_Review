@@ -37,6 +37,20 @@ def login(c):
         st.caption(c.brand["subtitle"])
         st.markdown('<span class="gs-badge">Sistema local offline</span>', unsafe_allow_html=True)
         if c.store.user_count() == 0:
+            import os
+            import hmac
+
+            setup_key = os.environ.get("GEOSLOPE_SETUP_KEY", "")
+            entered_key = st.text_input(
+                "Clave de instalación",
+                type="password",
+                key="setup_key",
+            )
+
+            if not setup_key or not hmac.compare_digest(entered_key, setup_key):
+                st.warning("Introduce la clave de instalación para continuar.")
+                return
+
             st.subheader("Crear administrador")
             st.write("Configura tu cuenta y registra el segundo factor para empezar.")
             with st.form("bootstrap"):
@@ -50,7 +64,7 @@ def login(c):
                 if st.form_submit_button("Crear administrador", type="primary"):
                     if password != repeat:
                         raise ValidationError("Las contraseñas no coinciden.")
-                    st.session_state.challenge = c.auth.bootstrap(username, name, password)
+                    st.session_state.challenge = c.auth.bootstrap(username, name, password, setup_key=entered_key)
                     st.session_state.auth_stage = "enroll"
                     st.rerun()
         elif "challenge" not in st.session_state:
