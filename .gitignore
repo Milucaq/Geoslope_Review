@@ -1,0 +1,38 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+data/runtime/
+data/backups/
+data/exports/
+*.key
+
+# Cobertura y resultados de pruebas
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+pytest-results.xml
+*.egg-info/
+
+# Archivos temporales de Python
+*.pyc
+.ruff_cache/
+dist/
+build/
+
+# Archivos locales
+.vscode/
+.idea/
+*.log
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos de credenciales de Streamlit
+.streamlit/secrets.toml
+
+# Capturas de configuracion de autenticacion
+**/02_totp_setup.png

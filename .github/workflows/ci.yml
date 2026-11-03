@@ -1,0 +1,51 @@
+﻿name: GeoSlope Review - CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Pruebas automatizadas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+          python -m pip check
+
+      - name: Ejecutar pruebas y cobertura
+        run: |
+          python -m pytest -q tests --junitxml=pytest-results.xml --cov=gsreview --cov-report=xml:coverage.xml --cov-report=term-missing
+
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoslope-test-results
+          path: |
+            pytest-results.xml
+            coverage.xml
+          if-no-files-found: warn
