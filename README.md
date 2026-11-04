@@ -66,4 +66,50 @@ La instalación descarga dependencias; la ejecución posterior no necesita inter
 
 Pruebas desde la raíz `monitoreo-taludes`: `PYTHONPATH=geoslope_review python -m pytest -q tests geoslope_review/tests`. En Windows usa `$env:PYTHONPATH="geoslope_review"` antes del comando. Ruff se ejecuta desde la subcarpeta de aplicación: `python -m ruff check .`. Las pruebas de navegador son opcionales para desarrolladores; requieren `requirements-dev.txt` y Chromium local: `python scripts/validate_browser.py --chromium RUTA`.
 
+## Desarrollo colaborativo y trazabilidad Jira–GitHub
+
+GeoSlope Review utiliza un flujo de trabajo colaborativo basado en Git, Jira y GitHub Actions.
+
+### Estrategia de ramas
+
+- `main`: contiene la versión estable del sistema.
+- `develop`: integra los cambios revisados del equipo.
+- `feature/HU-XXX-descripcion`: rama individual vinculada a una historia de usuario de Jira.
+
+Cada integrante desarrolla sus modificaciones en una rama independiente y propone su integración mediante un Pull Request dirigido a `develop`.
+
+### Revisión de Pull Requests
+
+Antes de integrar un cambio, el equipo debe:
+
+1. Verificar que el Pull Request incluya el identificador de Jira.
+2. Revisar los archivos modificados y la descripción técnica.
+3. Ejecutar las pruebas automatizadas.
+4. Confirmar que GitHub Actions finalice satisfactoriamente.
+5. Obtener la revisión de otro integrante del equipo.
+
+Los cambios aprobados se integran a `develop`. Posteriormente, las versiones validadas pueden incorporarse a `main`.
+
+### Ejecución de pruebas
+
+Desde la raíz del proyecto, con las dependencias instaladas:
+
+```powershell
+python -m pytest -q
+```
+
+El proyecto cuenta con pruebas de integración, seguridad, interfaz y funcionalidades espaciales.
+
+### Evidencias de desarrollo
+
+Cada historia de usuario debe registrar en Jira:
+
+- Responsable y estado de avance.
+- Fechas planificadas y reales.
+- Rama y commits asociados.
+- Enlace al Pull Request.
+- Resultados de las pruebas.
+- Capturas o demostraciones de la funcionalidad implementada.
+
+Este procedimiento permite mantener la trazabilidad entre la planificación del Sprint, el desarrollo del código y la revisión del equipo.
 > GeoSlope Review es una herramienta experimental de apoyo. Las anomalías y episodios mostrados no representan predicciones de falla ni niveles de riesgo. Los resultados requieren revisión de un especialista geotécnico y no deben utilizarse por sí solos para tomar decisiones operativas o de seguridad.
