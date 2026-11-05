@@ -79,7 +79,8 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
             ep_counter += 1
 
         cum_disp = 0.0
-        prev_disp = 0.0
+        prev_valid_disp = 0.0
+        prev_valid_ts = start_ts
         ep_marks = 0
         ep_agreements = 0
         ep_interrupted = False
@@ -89,6 +90,9 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
         for step_idx, ts in enumerate(timestamps):
             elapsed_h = float(step_idx * cfg.cadence_hours)
             dt_days = cfg.cadence_hours / 24.0
+            hours_since_prev = (
+                float((ts - prev_valid_ts).total_seconds() / 3600.0) if step_idx > 0 else np.nan
+            )
 
             if step_idx == 0:
                 eligible = False
@@ -110,13 +114,15 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
                 cum_disp = max(0.0, cum_disp + drift)
 
             disp_mm = round(cum_disp + abs(noise), 4) if eligible else np.nan
+            actual_dt_days = hours_since_prev / 24.0 if np.isfinite(hours_since_prev) else np.nan
             rate_mm_day = (
-                round(abs(disp_mm - prev_disp) / dt_days, 4)
-                if eligible and np.isfinite(prev_disp)
+                round(abs(disp_mm - prev_valid_disp) / actual_dt_days, 4)
+                if eligible and np.isfinite(prev_valid_disp) and actual_dt_days > 0
                 else np.nan
             )
             if eligible:
-                prev_disp = disp_mm
+                prev_valid_disp = disp_mm
+                prev_valid_ts = ts
 
             dx = (0.0 if np.isnan(disp_mm) else disp_mm) * 0.0006
             dy = (0.0 if np.isnan(disp_mm) else disp_mm) * -0.0005
@@ -179,6 +185,7 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
                     "reported_3d_movement_mm": disp_mm,
                     "movement_rate_mm_per_day": rate_mm_day,
                     "elapsed_hours": elapsed_h,
+                    "hours_since_previous_observation": hours_since_prev,
                     "model_eligible": eligible,
                     "model_ineligibility_reason": inelig_reason,
                     "baseline_score": b_score,
