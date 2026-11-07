@@ -125,7 +125,11 @@ def _render_content(c, token):
         candidates = columns[3].toggle(
             "Solo candidatos", key="sx_candidates", disabled=terrain_active
         )
-        labels = columns[4].toggle("Etiquetas", key="sx_labels", disabled=terrain_active)
+        labels = columns[4].toggle(
+            "Mostrar identificadores",
+            key="sx_labels",
+            disabled=terrain_active,
+        )
         dimension = (
             columns[5].segmented_control(
                 "Vista", ["2D", "3D"], default="3D", key="sx_dimension", selection_mode="single"
@@ -160,10 +164,17 @@ def _render_content(c, token):
     if visible.empty:
         with st.container(key="spatial_empty"):
             st.info(
-                "No existen prismas con los filtros aplicados. Cambia la fecha o pulsa Limpiar filtros."
+                "No hay puntos disponibles para visualizar con los criterios actuales."
             )
             st.caption(
-                "Selecciona un prisma para consultar sus mediciones. No se añade ninguna posición artificial."
+                "Puedes modificar los filtros o restablecerlos para recuperar la vista completa de prismas."
+            )
+            st.button(
+                "Restablecer filtros",
+                key="sx_empty_clear",
+                icon=":material/restart_alt:",
+                on_click=_clear,
+                args=(last,),
             )
         return
     valid_ids = sorted(visible.prism_id.unique())
@@ -200,7 +211,12 @@ def _render_content(c, token):
                 title=None,
                 height=540,
                 margin={"l": 10, "r": 10, "t": 20, "b": 85},
-                legend={"orientation": "h", "y": -0.16},
+                legend={
+                    "title": {"text": "Estados de los prismas"},
+                    "orientation": "h",
+                    "y": -0.16,
+                    "x": 0,
+                },
                 uirevision=str(st.session_state.get("sx_camera_revision", 0)) + dimension,
             )
             if dimension == "3D" and not st.session_state.get("sx_focus", False):

@@ -59,4 +59,26 @@ def test_workspace_center_reset_and_empty_filters(app, monkeypatch):
     assert not at.session_state["sx_focus"] and not at.exception
     [i for i in at.text_input if i.label == "Buscar prisma"][0].set_value("SIN-PRISMA").run()
     assert not at.exception and not at.error
-    assert any("No existen prismas" in x.value for x in at.info)
+    assert any(
+        "No hay puntos disponibles para visualizar con los criterios actuales." in x.value
+        for x in at.info
+    )
+
+    reset_buttons = [b for b in at.button if b.label == "Restablecer filtros"]
+    assert reset_buttons
+
+    reset_buttons[0].click().run()
+
+    assert not at.exception and not at.error
+    assert at.session_state["sx_search"] == ""
+    assert at.session_state["sx_state"] == "Todos"
+    assert at.session_state["sx_candidates"] is False
+
+def test_spatial_identifier_control_changes_marker_labels(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
+
+    with_labels = spatial(points, "3D", labels=True)
+    without_labels = spatial(points, "3D", labels=False)
+
+    assert all(trace.mode == "markers+text" for trace in with_labels.data)
+    assert all(trace.mode == "markers" for trace in without_labels.data)
