@@ -1,6 +1,7 @@
 import numpy as np
 from streamlit.testing.v1 import AppTest
 from gsreview.presentation.charts import spatial
+from gsreview.presentation.spatial_workspace import _visible_state_summary
 
 
 def test_spatial_chart_uses_only_original_coordinates_and_highlights_selection(app):
@@ -82,3 +83,50 @@ def test_spatial_identifier_control_changes_marker_labels(app):
 
     assert all(trace.mode == "markers+text" for trace in with_labels.data)
     assert all(trace.mode == "markers" for trace in without_labels.data)
+
+def test_spatial_legend_reports_visible_state_counts(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
+    fig = spatial(points, "3D")
+
+    legend_names = {
+        trace.name
+        for trace in fig.data
+        if trace.showlegend is not False
+    }
+
+    counts = points.causal_state.value_counts()
+
+    candidate_count = int(counts.get("candidato_revision", 0))
+    mark_count = int(
+        counts.get("marca_aislada", 0)
+        + counts.get("episodio_en_observacion", 0)
+    )
+    non_evaluable_count = int(counts.get("no_evaluable", 0))
+    normal_count = int(counts.get("sin_marca", 0))
+
+    if candidate_count:
+        assert f"Candidato para revisión ({candidate_count})" in legend_names
+
+    if mark_count:
+        assert f"Marca estadística ({mark_count})" in legend_names
+
+    if non_evaluable_count:
+        assert f"No evaluable ({non_evaluable_count})" in legend_names
+
+    if normal_count:
+        assert f"Sin marca ({normal_count})" in legend_names
+
+
+def test_visible_state_summary_matches_spatial_data(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
+    summary = _visible_state_summary(points)
+
+    assert sum(summary.values()) == len(points)
+    assert summary["Candidato para revisión"] == int(
+        points.causal_state.eq("candidato_revision").sum()
+    )
+    assert summary["Marca estadística"] == int(
+        points.causal_state.isin(
+            ["marca_aislada", "episodio_en_observacion"]
+        ).sum()
+    )

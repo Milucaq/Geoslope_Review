@@ -43,6 +43,18 @@ def _clear(last_date):
     st.session_state.sx_focus = False
     st.session_state.sx_camera_revision = st.session_state.get("sx_camera_revision", 0) + 1
 
+def _visible_state_summary(points):
+    counts = points["causal_state"].value_counts()
+
+    return {
+        "Candidato para revisión": int(counts.get("candidato_revision", 0)),
+        "Marca estadística": int(
+            counts.get("marca_aislada", 0)
+            + counts.get("episodio_en_observacion", 0)
+        ),
+        "No evaluable": int(counts.get("no_evaluable", 0)),
+        "Sin marca": int(counts.get("sin_marca", 0)),
+    }
 
 def render_workspace(c, token):
     actor = c.auth.authorize(token, "read")
@@ -192,6 +204,14 @@ def _render_content(c, token):
         with st.container(key="spatial_scene_panel"):
             plot_title, plot_reset = st.columns([5, 1], vertical_alignment="center")
             plot_title.markdown("**Ubicaciones instrumentales · datos originales**")
+            summary = _visible_state_summary(visible)
+            plot_title.caption(
+                f"Puntos visibles: {len(visible)} · "
+                + " · ".join(
+                    f"{label}: {count}"
+                    for label, count in summary.items()
+                )
+            )
             if plot_reset.button(
                 "Vista completa", key="sx_reset_camera", help="Restablecer cámara", width="stretch"
             ):
