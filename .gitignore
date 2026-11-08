@@ -36,10 +36,3 @@ build/
 
 # Capturas de configuracion de autenticacion
 **/02_totp_setup.png
-.venv/
-__pycache__/
-*.pyc
-data/runtime/
-*.db
-*.sqlite3
-.env
