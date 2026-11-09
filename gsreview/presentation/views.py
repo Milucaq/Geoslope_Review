@@ -30,87 +30,125 @@ NAV = (
 
 
 def login(c):
-    left, middle, right = st.columns([1, 1.8, 1])
-    with middle:
-        st.image(str(c.app_root / "assets/logo.svg"), width=240)
-        st.title(c.brand["name"])
-        st.caption(c.brand["subtitle"])
-        st.markdown('<span class="gs-badge">Sistema local offline</span>', unsafe_allow_html=True)
-        if c.store.user_count() == 0:
-            import os
-            import hmac
+    import hmac
+    import os
 
-            setup_key = os.environ.get("GEOSLOPE_SETUP_KEY", "")
-            entered_key = st.text_input(
-                "Clave de instalación",
-                type="password",
-                key="setup_key",
-            )
+    from gsreview.presentation.login_theme import header_html, hero_html, login_css
 
-            if not setup_key or not hmac.compare_digest(entered_key, setup_key):
-                st.warning("Introduce la clave de instalación para continuar.")
-                return
+    brand = c.brand["name"]
+    needs_setup = c.store.user_count() == 0
+    setup_key = os.environ.get("GEOSLOPE_SETUP_KEY", "")
+    # Solo para iterar el diseño: GEOSLOPE_UI_PREVIEW=1 muestra los formularios sin la clave.
+    # El backend sigue validando la clave real al crear el administrador.
+    preview = os.environ.get("GEOSLOPE_UI_PREVIEW") == "1"
 
-            st.subheader("Crear administrador")
-            st.write("Configura tu cuenta y registra el segundo factor para empezar.")
-            with st.form("bootstrap"):
-                username = st.text_input("Usuario", key="setup_username")
-                name = st.text_input("Nombre visible", key="setup_name")
-                password = st.text_input("Contraseña", type="password", key="setup_password")
-                repeat = st.text_input("Repetir contraseña", type="password", key="setup_repeat")
-                st.caption(
-                    "12 caracteres como mínimo; mayúscula, minúscula, número y símbolo; sin tu usuario."
-                )
-                if st.form_submit_button("Crear administrador", type="primary"):
-                    if password != repeat:
-                        raise ValidationError("Las contraseñas no coinciden.")
-                    st.session_state.challenge = c.auth.bootstrap(username, name, password, setup_key=entered_key)
-                    st.session_state.auth_stage = "enroll"
-                    st.rerun()
-        elif "challenge" not in st.session_state:
-            st.subheader("Iniciar sesión")
-            with st.form("login"):
-                username = st.text_input("Usuario", key="login_username")
-                password = st.text_input("Contraseña", type="password", key="login_password")
-                if st.form_submit_button("Iniciar sesión", type="primary"):
-                    challenge, stage = c.auth.password_step(username, password)
-                    st.session_state.challenge, st.session_state.auth_stage = challenge, stage
-                    st.rerun()
-        if "challenge" in st.session_state:
-            enroll = st.session_state.auth_stage == "enroll"
-            st.subheader("Configurar segundo factor" if enroll else "Verificar identidad")
-            if enroll:
-                qr, secret = c.auth.enrollment(st.session_state.challenge)
-                st.write(
-                    "Escanea el QR con tu autenticador. La verificación funciona sin internet."
-                )
-                st.image(qr, width=210)
-                with st.expander("Configuración manual"):
-                    st.code(secret)
-            recovery = False if enroll else st.checkbox("Usar código de recuperación")
-            with st.form("totp"):
-                code = st.text_input(
-                    "Código de recuperación" if recovery else "Código de seis dígitos",
-                    key="otp_code",
-                    type="password" if recovery else "default",
-                )
-                st.caption(
-                    "La verificación expira en cinco minutos. Cada código TOTP se acepta una sola vez."
-                )
-                if st.form_submit_button("Verificar", type="primary"):
-                    token, codes = c.auth.second_step(
-                        st.session_state.challenge, code.strip(), enroll, recovery
-                    )
-                    st.session_state.token = token
-                    st.session_state.recovery_once = codes
-                    del st.session_state.challenge
-                    st.rerun()
-            if st.button("Volver"):
-                st.session_state.pop("challenge", None)
-                st.rerun()
-        st.caption(
-            "Acceso autorizado. Las anomalías requieren revisión geotécnica y no constituyen predicciones de falla."
+    def key_is_valid(value):
+        return bool(setup_key) and hmac.compare_digest(value.encode(), setup_key.encode())
+
+    # El valor del widget ya está en session_state al inicio de cada ejecución,
+    # así el encabezado correcto se pinta antes de dibujar los campos.
+    key_ok = preview or key_is_valid(st.session_state.get("setup_key", ""))
+
+    if "challenge" in st.session_state:
+        enroll = st.session_state.auth_stage == "enroll"
+        title = "Configura el segundo factor" if enroll else "Verifica tu identidad"
+        subtitle = (
+            "Escanea el QR con tu autenticador. La verificación funciona sin internet."
+            if enroll
+            else "Introduce el código de tu autenticador para terminar de ingresar."
         )
+    elif needs_setup:
+        title = "Crea el administrador" if key_ok else "Activa tu instalación"
+        subtitle = (
+            "Configura tu cuenta y registra el segundo factor para empezar."
+            if key_ok
+            else "Introduce la clave de instalación para continuar."
+        )
+    else:
+        title, subtitle = "Bienvenido", "Ingresa con tu usuario y contraseña para acceder a la plataforma."
+
+    with st.container(key="gs_login_root"):
+        st.markdown(login_css(), unsafe_allow_html=True)
+        hero, panel = st.columns([3, 2], gap="small")
+        with hero:
+            st.markdown(hero_html(), unsafe_allow_html=True)
+        with panel, st.container(key="gs_login_card"):
+            st.markdown(header_html(brand, title, subtitle), unsafe_allow_html=True)
+            if needs_setup:
+                entered_key = st.text_input(
+                    "Clave de instalación",
+                    type="password",
+                    key="setup_key",
+                    placeholder="Clave entregada con la instalación",
+                )
+                if not (preview or key_is_valid(entered_key)):
+                    if entered_key:
+                        st.error("La clave de instalación no es correcta.")
+                    return
+
+                with st.form("bootstrap"):
+                    username = st.text_input("Usuario", key="setup_username", placeholder="Ej. admin")
+                    name = st.text_input("Nombre visible", key="setup_name", placeholder="Nombre y apellido")
+                    password = st.text_input(
+                        "Contraseña", type="password", key="setup_password", placeholder="Mínimo 12 caracteres"
+                    )
+                    repeat = st.text_input(
+                        "Repetir contraseña", type="password", key="setup_repeat", placeholder="Repite la contraseña"
+                    )
+                    st.caption(
+                        "12 caracteres como mínimo; mayúscula, minúscula, número y símbolo; sin tu usuario."
+                    )
+                    if st.form_submit_button("Crear administrador", type="primary"):
+                        if password != repeat:
+                            raise ValidationError("Las contraseñas no coinciden.")
+                        st.session_state.challenge = c.auth.bootstrap(
+                            username, name, password, setup_key=entered_key
+                        )
+                        st.session_state.auth_stage = "enroll"
+                        st.rerun()
+            elif "challenge" not in st.session_state:
+                with st.form("login"):
+                    username = st.text_input("Usuario", key="login_username", placeholder="Tu nombre de usuario")
+                    password = st.text_input(
+                        "Contraseña", type="password", key="login_password", placeholder="Tu contraseña"
+                    )
+                    if st.form_submit_button("Iniciar sesión", type="primary"):
+                        challenge, stage = c.auth.password_step(username, password)
+                        st.session_state.challenge, st.session_state.auth_stage = challenge, stage
+                        st.rerun()
+                st.markdown(
+                    '<p class="gs-hint">¿Perdiste tu autenticador? En el siguiente paso puedes usar un código de recuperación.</p>',
+                    unsafe_allow_html=True,
+                )
+            if "challenge" in st.session_state:
+                enroll = st.session_state.auth_stage == "enroll"
+                if enroll:
+                    qr, secret = c.auth.enrollment(st.session_state.challenge)
+                    st.image(qr, width=210)
+                    with st.expander("Configuración manual"):
+                        st.code(secret)
+                recovery = False if enroll else st.checkbox("Usar código de recuperación")
+                with st.form("totp"):
+                    code = st.text_input(
+                        "Código de recuperación" if recovery else "Código de seis dígitos",
+                        key="otp_code",
+                        type="password" if recovery else "default",
+                        placeholder="Código de recuperación" if recovery else "000000",
+                    )
+                    st.caption(
+                        "La verificación expira en cinco minutos. Cada código TOTP se acepta una sola vez."
+                    )
+                    if st.form_submit_button("Verificar", type="primary"):
+                        token, codes = c.auth.second_step(
+                            st.session_state.challenge, code.strip(), enroll, recovery
+                        )
+                        st.session_state.token = token
+                        st.session_state.recovery_once = codes
+                        del st.session_state.challenge
+                        st.rerun()
+                if st.button("Volver"):
+                    st.session_state.pop("challenge", None)
+                    st.rerun()
 
 
 def dashboard(c, token):
