@@ -545,6 +545,94 @@ def quality_view(c, token):
         .reset_index(),
         hide_index=True,
     )
+    _render_synthetic_panel(c, token)
+
+
+def _render_synthetic_panel(c, token):
+    st.subheader("Simulación sintética de monitoreo (HU-103)")
+    st.caption(
+        "Genera series temporales sintéticas de prismas para pruebas de monitoreo "
+        "y validación funcional sin alterar los artefactos congelados."
+    )
+    with st.expander("Configurar y generar escenario sintético", expanded=False):
+        with st.form("synthetic_generator_form"):
+            col1, col2, col3 = st.columns(3)
+            n_prisms = col1.number_input(
+                "Número de prismas", min_value=4, max_value=40, value=12, step=1, key="syn_prisms"
+            )
+            days = col2.number_input(
+                "Horizonte (días)", min_value=3, max_value=90, value=15, step=1, key="syn_days"
+            )
+            cadence = col3.selectbox(
+                "Cadencia (horas)", [6, 12, 24], index=1, key="syn_cadence"
+            )
+            col4, col5, col6 = st.columns(3)
+            deformed = col4.slider(
+                "Fracción con deformación", 0.0, 1.0, 0.25, 0.05, key="syn_deformed"
+            )
+            noise = col5.number_input(
+                "Ruido instrumental (mm)",
+                min_value=0.05,
+                max_value=5.0,
+                value=0.35,
+                step=0.05,
+                key="syn_noise",
+            )
+            seed = col6.number_input(
+                "Semilla reproducible",
+                min_value=1,
+                max_value=99999,
+                value=42,
+                step=1,
+                key="syn_seed",
+            )
+            if st.form_submit_button("Generar datos sintéticos", type="primary"):
+                st.session_state.synthetic_scenario = c.synthetic.generate(
+                    token,
+                    n_prisms=int(n_prisms),
+                    days=int(days),
+                    cadence_hours=int(cadence),
+                    deformed_fraction=float(deformed),
+                    noise_mm=float(noise),
+                    seed=int(seed),
+                )
+        scenario = st.session_state.get("synthetic_scenario")
+        if scenario:
+            summary = scenario["summary"]
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Prismas sintéticos", summary["prismas"])
+            m2.metric("Registros generados", summary["registros"])
+            m3.metric("Candidatos híbridos", summary["candidatos_hibridos"])
+            m4.metric("Episodios simulados", summary["episodios"])
+            syn_rows = scenario["records"]
+            st.plotly_chart(
+                px.line(
+                    syn_rows.dropna(subset=["reported_3d_movement_mm"]),
+                    x="timestamp",
+                    y="reported_3d_movement_mm",
+                    color="prism_id",
+                    title="Desplazamiento 3D sintético acumulado (mm)",
+                ),
+                width="stretch",
+            )
+            st.dataframe(
+                syn_rows[
+                    [
+                        "prism_id",
+                        "timestamp",
+                        "sector",
+                        "easting",
+                        "northing",
+                        "rl",
+                        "reported_3d_movement_mm",
+                        "movement_rate_mm_per_day",
+                        "causal_state",
+                        "candidate_hybrid",
+                    ]
+                ].head(50),
+                hide_index=True,
+                width="stretch",
+            )
 
 
 def report_view(c, token):
