@@ -14,6 +14,7 @@ from gsreview.domain.rules import (
     ValidationError,
 )
 from gsreview.presentation.charts import series
+from gsreview.application.csv_import import validate_csv, MAX_FILE_SIZE
 
 NAV = (
     "Inicio",
@@ -450,6 +451,51 @@ def quality_view(c, token):
     st.title("Calidad y cobertura")
     rows = c.reader.rows
     bad = rows.loc[~rows.model_eligible]
+
+    st.subheader("Importación de mediciones externas")
+    st.caption(
+        "Carga un archivo CSV para validar su estructura y visualizar "
+        "sus mediciones. Los datos históricos no serán modificados."
+    )
+
+    with st.expander("Ver formato CSV requerido"):
+        st.code(
+            "source_record_id,prism_id,timestamp,easting,northing,"
+            "rl,movement_rate_mm_per_day,elapsed_hours\n"
+            "R001,P001,2026-11-09T10:00:00Z,"
+            "500000,8500000,1200,2.5,24",
+            language="csv",
+        )
+
+    uploaded_csv = st.file_uploader(
+        "Seleccionar archivo de mediciones CSV",
+        type=["csv"],
+        key="hu106_csv_upload",
+        max_upload_size=10,
+    )
+
+    if uploaded_csv is not None:
+        content = uploaded_csv.getvalue()
+
+        if len(content) > MAX_FILE_SIZE:
+            st.error("El archivo supera el límite de 10 MB.")
+        else:
+            try:
+                validated_data = validate_csv(content)
+            except ValidationError as exc:
+                st.error(f"Archivo rechazado: {exc}")
+            else:
+                st.success("Archivo CSV validado correctamente.")
+                st.metric("Registros importados para vista previa", len(validated_data))
+                st.metric("Prismas identificados", validated_data["prism_id"].nunique())
+                st.dataframe(validated_data.head(100), hide_index=True)
+                st.info(
+                    "Vista previa únicamente. Los registros no se han guardado "
+                    "ni incorporado al análisis histórico."
+                )
+
+    st.divider()
+
     st.metric("Registros no evaluables", len(bad))
     st.info(
         "Ausencia de datos no significa estabilidad. La calidad se conserva separada de las marcas estadísticas."
