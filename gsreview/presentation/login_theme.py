@@ -29,7 +29,7 @@ def _mix(a: str, b: str, t: float) -> str:
 
 def _pit_svg() -> str:
     """Mina a tajo abierto con bancos (taludes) en estilo semi-plano, más capas de visión computacional."""
-    rings, rims, points = [], [], []
+    rings , points = [], [], []
     n = 8
     for i in range(n):
         rx, ry, cy = 600 - 66 * i, 250 - 28 * i, 430 + 26 * i
