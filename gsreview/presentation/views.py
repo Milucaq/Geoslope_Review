@@ -633,7 +633,7 @@ def _render_synthetic_panel(c, token):
                 key="syn_seed",
             )
             if st.form_submit_button("Generar datos sintéticos", type="primary"):
-                st.session_state.synthetic_scenario = c.synthetic.generate(
+                generated = c.synthetic.generate(
                     token,
                     n_prisms=int(n_prisms),
                     days=int(days),
@@ -642,6 +642,10 @@ def _render_synthetic_panel(c, token):
                     noise_mm=float(noise),
                     seed=int(seed),
                 )
+                generated["csv_bytes"] = c.synthetic.export_csv(
+                    token, generated, seed=int(seed)
+                )
+                st.session_state.synthetic_scenario = generated
         scenario = st.session_state.get("synthetic_scenario")
         if scenario:
             summary = scenario["summary"]
@@ -678,6 +682,21 @@ def _render_synthetic_panel(c, token):
                 ].head(50),
                 hide_index=True,
                 width="stretch",
+            )
+            csv_bytes = scenario.get("csv_bytes") or c.synthetic.export_csv(
+                token, scenario, seed=summary["semilla"]
+            )
+            st.caption(
+                "Exportación CSV (HU-107): incluye mediciones evaluables con esquema "
+                "compatible con el módulo de importación externa (HU-106)."
+            )
+            st.download_button(
+                "Descargar mediciones sintéticas (CSV)",
+                data=csv_bytes,
+                file_name=f"geoslope_sintetico_seed_{summary['semilla']}.csv",
+                mime="text/csv",
+                key="hu107_csv_download",
+                type="primary",
             )
 
 

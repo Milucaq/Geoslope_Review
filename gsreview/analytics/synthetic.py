@@ -15,6 +15,27 @@ from gsreview.domain.rules import ValidationError
 BASELINE_Q99 = 4.439772224885318
 IFOREST_Q99 = 0.5872931971929567
 
+SYNTHETIC_CSV_COLUMNS = (
+    "source_record_id",
+    "prism_id",
+    "timestamp",
+    "easting",
+    "northing",
+    "rl",
+    "reported_3d_movement_mm",
+    "movement_rate_mm_per_day",
+    "elapsed_hours",
+)
+
+SYNTHETIC_CSV_NUMERIC_COLUMNS = (
+    "easting",
+    "northing",
+    "rl",
+    "reported_3d_movement_mm",
+    "movement_rate_mm_per_day",
+    "elapsed_hours",
+)
+
 SECTORS = (
     ("Talud Oeste Alto", "Banco 280", 1420.0, 4880.0, 280.0),
     ("Talud Oeste Medio", "Banco 250", 1465.0, 4850.0, 250.0),
@@ -248,3 +269,57 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
         "semilla": cfg.seed,
     }
     return {"records": records_df, "episodes": episodes_df, "summary": summary, "config": cfg}
+
+
+def export_synthetic_records_to_csv(records: pd.DataFrame) -> bytes:
+    """Exporta mediciones sintéticas evaluables a CSV compatible con HU-106 y HU-107."""
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        raise ValidationError("No hay registros sintéticos para exportar a CSV.")
+
+    missing = [col for col in SYNTHETIC_CSV_COLUMNS if col not in records.columns]
+    if missing:
+        raise ValidationError(
+            "Faltan columnas requeridas para exportar CSV: " + ", ".join(missing)
+        )
+
+    if "model_eligible" in records.columns:
+        eligible_mask = records["model_eligible"].fillna(False).astype(bool)
+        frame = records.loc[eligible_mask, list(SYNTHETIC_CSV_COLUMNS)].copy()
+    else:
+        frame = records.loc[:, list(SYNTHETIC_CSV_COLUMNS)].copy()
+
+    if frame.empty:
+        raise ValidationError("No existen mediciones sintéticas evaluables para exportar.")
+
+    for column in ("source_record_id", "prism_id"):
+        frame[column] = frame[column].astype(str).str.strip()
+        if frame[column].isin(["", "nan", "None", "<NA>"]).any():
+            raise ValidationError(f"La columna {column} contiene identificadores inválidos.")
+
+    if frame["source_record_id"].duplicated().any():
+        raise ValidationError("Existen identificadores de registro duplicados en la exportación.")
+
+    parsed_ts = pd.to_datetime(frame["timestamp"], errors="coerce", utc=True)
+    if parsed_ts.isna().any():
+        raise ValidationError("Existen fechas u horas inválidas en los datos a exportar.")
+
+    if pd.DataFrame({"prism_id": frame["prism_id"], "timestamp": parsed_ts}).duplicated().any():
+        raise ValidationError(
+            "Existen mediciones duplicadas para un mismo prisma y fecha en la exportación."
+        )
+
+    frame["timestamp"] = parsed_ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    for column in SYNTHETIC_CSV_NUMERIC_COLUMNS:
+        numeric_series = pd.to_numeric(frame[column], errors="coerce")
+        if numeric_series.isna().any() or not np.isfinite(numeric_series.to_numpy()).all():
+            raise ValidationError(
+                f"La columna {column} contiene valores numéricos inválidos o vacíos."
+            )
+        frame[column] = numeric_series
+
+    if frame["elapsed_hours"].lt(0).any():
+        raise ValidationError("El tiempo transcurrido no puede ser negativo.")
+
+    return frame.to_csv(index=False, lineterminator="\n").encode("utf-8")
+
