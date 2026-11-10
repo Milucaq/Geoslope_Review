@@ -2,9 +2,14 @@
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - develop
   workflow_dispatch:
 
 permissions:
@@ -12,9 +17,9 @@ permissions:
 
 jobs:
   tests:
-    name: Pruebas automatizadas
+    name: Calidad, seguridad y pruebas
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Descargar repositorio
@@ -36,6 +41,15 @@ jobs:
           python -m pip install -e .
           python -m pip check
 
+      - name: Verificar calidad con Ruff
+        run: python -m ruff check .
+
+      - name: Analizar seguridad con Bandit
+        run: python -m bandit -r gsreview -ll
+
+      - name: Auditar dependencias
+        run: python -m pip_audit -r requirements.txt
+
       - name: Preparar artefactos originales
         run: |
           mkdir -p ../config ../data/processed ../models ../reports
@@ -44,7 +58,12 @@ jobs:
 
       - name: Ejecutar pruebas y cobertura
         run: |
-          python -m pytest -q tests --junitxml=pytest-results.xml --cov=gsreview --cov-report=xml:coverage.xml --cov-report=term-missing
+          python -m pytest -q tests \
+            --junitxml=pytest-results.xml \
+            --cov=gsreview \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=90
 
       - name: Guardar evidencias
         if: always()
