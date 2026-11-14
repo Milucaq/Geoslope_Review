@@ -35,6 +35,7 @@ def _clear(last_date):
         "sx_search": "",
         "sx_state": "Todos",
         "sx_candidates": False,
+        "sx_prisms": [],
         "sx_labels": False,
         "sx_dimension": "3D",
         "sx_terrain": False,
@@ -156,6 +157,27 @@ def _render_content(c, token):
             on_click=_clear,
             args=(last,),
         )
+        prism_options = sorted(
+            c.reader.rows.prism_id.dropna().unique().tolist()
+        )
+
+        prism_columns = st.columns([4, 1], vertical_alignment="bottom", gap="small")
+
+        selected_prisms = prism_columns[0].multiselect(
+            "Prismas a visualizar",
+            options=prism_options,
+            placeholder="Todos los prismas",
+            key="sx_prisms",
+            disabled=terrain_active,
+        )
+
+        prism_columns[1].button(
+            "Mostrar todos",
+            key="sx_clear_prisms",
+            disabled=terrain_active or not selected_prisms,
+            on_click=lambda: st.session_state.update({"sx_prisms": []}),
+            width="stretch",
+        )
     if st.toggle(
         "Mostrar relieve de Century Mine",
         key="sx_terrain",
@@ -172,7 +194,13 @@ def _render_content(c, token):
     )
     cutoff = pd.Timestamp(datetime.combine(day, time.max))
     points = service.points(token, cutoff)
-    visible = filter_points(points, search, state, candidates)
+    visible = filter_points(
+        points,
+        search,
+        state,
+        candidates,
+        selected_prisms,
+    )
     if visible.empty:
         with st.container(key="spatial_empty"):
             st.info(
