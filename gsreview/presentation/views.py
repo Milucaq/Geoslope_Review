@@ -17,7 +17,6 @@ from gsreview.domain.rules import (
 )
 from gsreview.presentation import theme
 from gsreview.presentation.charts import series
-from gsreview.application.csv_import import validate_csv, MAX_FILE_SIZE
 
 NAV = (
     "Inicio",
