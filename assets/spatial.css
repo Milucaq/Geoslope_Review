@@ -49,5 +49,22 @@ button:focus-visible,input:focus-visible {outline:2px solid {{spatial_selected}}
 .st-key-spatial_detail_panel{max-height:calc(100vh - 244px);padding-bottom:78px;}
 
 
-
 .sx-subtitle{margin:8px 0 0;padding:0;font-size:12px;line-height:1.4;color:#a8c2d9!important;}
+
+/* ===== Tema claro (alineado con styles.css) ===== */
+.stApp [data-testid="stAppViewContainer"]:has(.st-key-spatial_workspace){background:#F0F4F8;color:#0D2B38;}
+.stApp .st-key-spatial_workspace h1,.stApp .st-key-spatial_workspace h3{color:#0D2B38;}
+.stApp .st-key-spatial_workspace p,.stApp .st-key-spatial_workspace label,.stApp .st-key-spatial_workspace [data-testid="stWidgetLabel"] p,.stApp .st-key-spatial_workspace [data-testid="stCheckbox"] p,.stApp .st-key-spatial_workspace [data-testid="stToggle"] p,.stApp .st-key-spatial_workspace [data-testid="stCaptionContainer"],.stApp .st-key-spatial_workspace .sx-subtitle{color:#334155!important;}
+.stApp .st-key-spatial_workspace [data-testid="stMetric"]{background:#fff;border-color:#E2E8F0;}
+.stApp .st-key-spatial_workspace [data-testid="stMetricValue"]{color:#134E5E;}
+.stApp .st-key-spatial_filters,.stApp .st-key-spatial_scene_panel,.stApp .st-key-spatial_detail_panel,.stApp .st-key-spatial_terrain_panel,.stApp .st-key-spatial_actions{background:#fff;border-color:#E2E8F0;}
+.stApp .st-key-spatial_workspace [data-testid="stTextInput"] input,.stApp .st-key-spatial_workspace [data-testid="stDateInput"] input,.stApp .st-key-spatial_workspace [data-baseweb="select"]>div,.stApp .st-key-spatial_workspace [data-baseweb="select"]>div>div,.stApp .st-key-spatial_workspace [role="combobox"]{background:#F8FAFC!important;color:#0D2B38!important;border-color:#E2E8F0;}
+.stApp .st-key-spatial_workspace [data-baseweb="select"] span{color:#0D2B38;}
+.stApp .st-key-spatial_workspace input::placeholder{color:#64748B!important;}
+.stApp .st-key-spatial_workspace button{background:#fff;border:1px solid #E2E8F0;}
+.stApp .st-key-spatial_workspace button p,.stApp .st-key-spatial_workspace [data-testid="stSegmentedControl"] button p{color:#0D2B38;}
+.stApp .st-key-spatial_workspace button[aria-pressed="true"],.stApp .st-key-spatial_workspace [data-testid="stBaseButton-primary"],.stApp .st-key-spatial_workspace [data-testid="stBaseButton-segmented_controlActive"]{background:#134E5E;border-color:#134E5E;}
+.stApp .st-key-spatial_workspace button[aria-pressed="true"] p,.stApp .st-key-spatial_workspace [data-testid="stBaseButton-primary"] p,.stApp .st-key-spatial_workspace [data-testid="stBaseButton-segmented_controlActive"] p{color:#fff;}
+.stApp .sx-status span{background:#E0F2FE;border-color:#BAE6FD;color:#0369A1;}
+.stApp .sx-notice{background:#E0F2FE;border:1px solid #BAE6FD;color:#0369A1;}
+.stApp .sx-coordinates,.stApp .sx-coordinates td{color:#0D2B38;border-color:#E2E8F0;}
