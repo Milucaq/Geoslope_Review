@@ -6,6 +6,7 @@ from urllib.parse import quote
 import streamlit as st
 
 from gsreview.domain.rules import AccessDenied
+from gsreview.presentation import theme
 
 
 # Destination, visible label, required service permission, decorative SVG paths.
@@ -41,6 +42,18 @@ ROUTES = (
 )
 SECONDARY = (("Mi perfil", "profile"), ("Copias de seguridad", "backup"))
 
+# Subtítulos de grupo del menú (solo presentación).
+GROUPS = {
+    "Inicio": "Operación",
+    "Bandeja de revisión": "Operación",
+    "Vista espacial": "Operación",
+    "Prismas": "Análisis",
+    "Calidad de datos": "Análisis",
+    "Reportes": "Análisis",
+    "Usuarios": "Administración",
+    "Auditoría": "Administración",
+}
+
 
 def permitted_pages(c, token):
     """Ask the service, rather than maintaining a separate role permission table."""
@@ -71,24 +84,39 @@ def icon_css(key, path):
     return f'.st-key-{key} button::before{{mask-image:url("data:image/svg+xml,{quote(svg)}");}}'
 
 
+def _initials(name):
+    """Iniciales para el avatar; solo alfanuméricas porque se inyectan en CSS."""
+    letters = "".join(part[0] for part in str(name).split()[:2] if part[:1].isalnum())
+    return letters.upper() or "U"
+
+
 def render_navigation(c, token, actor):
     choices = permitted_pages(c, token)
     page = st.session_state.get("current_page", st.session_state.get("nav", choices[0]))
     if page not in choices:
         page = choices[0]
     navigate(page)
-    css = (c.app_root / "assets/navigation.css").read_text()
+    css = (c.app_root / "assets/navigation.css").read_text(encoding="utf-8")
     css += "\n" + "\n".join(icon_css("rail_" + str(i), r[3]) for i, r in enumerate(ROUTES))
     css += icon_css("rail_logout", "M9 4H3v16h6 M14 7l5 5-5 5 M7 12h12")
-    css += icon_css("rail_profile", "M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M4 22v-3a8 8 0 0 1 16 0v3")
+    css += f'\n.st-key-rail_profile button::before{{content:"{_initials(actor["display_name"])}";}}'
     st.html("<style>" + css + "</style>")
     with st.sidebar:
         with st.container(key="navigation_rail"):
-            st.image(str(c.app_root / "assets/logo_mark.svg"), width=48)
+            with st.container(key="rail_head"):
+                st.image(str(c.app_root / "assets/logo_mark.svg"), width=44)
+                theme.html(
+                    f'<div class="gx-brand-name">{escape(c.brand["name"])}'
+                    "<small>Monitoreo geotécnico</small></div>"
+                )
             with st.container(key="rail_links"):
+                last_group = None
                 for i, (destination, label, permission, path) in enumerate(ROUTES):
                     if destination not in choices:
                         continue
+                    if GROUPS[destination] != last_group:
+                        last_group = GROUPS[destination]
+                        theme.html(theme.sidebar_group(last_group))
                     with st.container(key="rail_" + str(i)):
                         st.button(
                             label,
@@ -98,6 +126,7 @@ def render_navigation(c, token, actor):
                             on_click=navigate,
                             args=(destination,),
                         )
+            theme.html(theme.sidebar_context())
             with st.container(key="rail_identity"):
                 role = "Administrador" if actor["role"] == "administrador" else "Ingeniero"
                 with st.container(key="rail_profile"):

@@ -1,4 +1,5 @@
 from gsreview.configuration import COLORS
+from gsreview.presentation import theme
 
 """Gráficos instrumentales locales; ninguna superficie se infiere de los prismas."""
 import plotly.graph_objects as go
@@ -30,14 +31,14 @@ def series(rows, episode=None):
             x=rows.timestamp,
             y=rows.reported_3d_movement_mm,
             name="Medición real",
-            line_color=COLORS["blue"],
+            line_color=theme.PALETTE["teal"],
         ),
         row=1,
         col=1,
     )
     for flag, label, color, symbol in [
-        ("baseline_mark_q99", "Marca base", COLORS["teal"], "circle-open"),
-        ("iforest_mark_q99", "Marca IF", COLORS["blue"], "diamond-open"),
+        ("baseline_mark_q99", "Marca base", theme.PALETTE["cyan"], "circle-open"),
+        ("iforest_mark_q99", "Marca IF", theme.PALETTE["sky"], "diamond-open"),
         ("agreement_same_row", "Coincidencia", COLORS["purple"], "diamond"),
         ("quality_interruption_flag", "Calidad", COLORS["gray"], "x"),
     ]:
@@ -63,12 +64,12 @@ def series(rows, episode=None):
                 y=rows[score],
                 mode="lines+markers",
                 name=score,
-                line_color=COLORS["teal"],
+                line_color=theme.PALETTE["teal_2"],
             ),
             row=row,
             col=1,
         )
-        fig.add_hline(y=threshold, line_dash="dash", line_color=COLORS["purple"], row=row, col=1)
+        fig.add_hline(y=threshold, line_dash="dash", line_color="#F59E0B", row=row, col=1)
     if episode is not None:
         for row in (1, 2, 3):
             fig.add_vrect(
@@ -80,12 +81,11 @@ def series(rows, episode=None):
                 row=row,
                 col=1,
             )
+    theme.style_fig(fig, 650)
     fig.update_layout(
-        height=650,
         title="Mediciones reales · anomalías estadísticas experimentales",
         legend={"orientation": "h", "y": -0.15},
         margin={"t": 80, "b": 100},
-        paper_bgcolor="white",
     )
     return fig
 
@@ -209,7 +209,7 @@ def spatial(points, dimension="3D", colors=None, selected=None, focus=False, lab
     fig.update_layout(
         title="Ubicaciones instrumentales · datos originales",
         height=650,
-        template="plotly_dark",
+        template="plotly_white",
         paper_bgcolor=COLORS["spatial_panel"],
         plot_bgcolor=COLORS["spatial_panel"],
         font={"color": COLORS["spatial_text"]},
@@ -277,7 +277,7 @@ def movement_preview(rows):
     fig.update_layout(
         height=265,
         title="Movimiento reportado (mm)",
-        template="plotly_dark",
+        template="plotly_white",
         paper_bgcolor=COLORS["spatial_panel"],
         plot_bgcolor=COLORS["spatial_panel"],
         margin={"l": 20, "r": 5, "t": 45, "b": 55},

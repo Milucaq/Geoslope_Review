@@ -1,10 +1,12 @@
-from gsreview.configuration import COLORS
-
 """Vistas sin SQL: cada operación utiliza servicios de aplicación autorizados."""
+
 import json
+from html import escape
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
 from gsreview.domain.rules import (
     STATUSES,
     RELEVANCE,
@@ -13,8 +15,8 @@ from gsreview.domain.rules import (
     NOTICE,
     ValidationError,
 )
+from gsreview.presentation import theme
 from gsreview.presentation.charts import series
-from gsreview.application.csv_import import validate_csv, MAX_FILE_SIZE
 
 NAV = (
     "Inicio",
@@ -28,6 +30,82 @@ NAV = (
     "Copias de seguridad",
     "Mi perfil",
 )
+
+
+# --------------------------------------------------------------------------------------------
+# Helpers de presentación
+# --------------------------------------------------------------------------------------------
+
+
+def _head(label):
+    """Inyecta el tema y pinta las migas de pan de la página."""
+    theme.inject_css()
+    theme.html(theme.page_head(label))
+
+
+def _section(title, hint=""):
+    tail = f"<span>{escape(hint)}</span>" if hint else ""
+    theme.html(f'<div class="gx-section"><h3>{escape(title)}</h3>{tail}</div>')
+
+
+def _stats(items):
+    """Franja de estadísticas: (etiqueta, valor, tono)."""
+    cells = "".join(
+        f'<div class="gx-stat gx-{tone}"><span>{escape(label)}</span><b>{escape(str(value))}</b></div>'
+        for label, value, tone in items
+    )
+    theme.html(f'<div class="gx-strip">{cells}</div>')
+
+
+def _go(page):
+    st.session_state.current_page = page
+    st.rerun()
+
+
+def _stepper(steps):
+    cells = []
+    for number, (title, detail, state) in enumerate(steps, 1):
+        mark = "✓" if state == "done" else str(number)
+        cells.append(
+            f'<div class="gx-step gx-{state}"><i>{mark}</i>'
+            f"<b>{escape(title)}</b><span>{escape(detail)}</span></div>"
+        )
+    theme.html(
+        '<div class="gx-card"><div class="gx-section"><h3>Ruta de revisión</h3>'
+        "<span>Del dato crudo al reporte</span></div>"
+        f'<div class="gx-stepper">{"".join(cells)}</div></div>'
+    )
+
+
+def _attention(items):
+    """Lista "Requiere tu atención": (icono, título, detalle, badge, tono, enlace, página)."""
+    with st.container(key="gx_attention"):
+        _section("Requiere tu atención", "Acciones sugeridas")
+        for i, (icon, title, hint, label, tone, link, page) in enumerate(items):
+            with st.container(key=f"gx_row_{i}"):
+                left, right = st.columns([4, 1.4], vertical_alignment="center")
+                theme.html(
+                    f'<div class="gx-row"><div class="gx-row-icon">{escape(icon)}</div>'
+                    f'<div class="gx-row-text"><b>{escape(title)}</b><span>{escape(hint)}</span></div>'
+                    f"{theme.badge(label, tone)}</div>",
+                    target=left,
+                )
+                if right.button(link, key=f"gx_go_{i}", type="tertiary"):
+                    _go(page)
+
+
+def _tone(action):
+    text = str(action).lower()
+    if any(word in text for word in ("fail", "denied", "lock", "revoke", "reset")):
+        return "warn"
+    if any(word in text for word in ("login", "create", "save", "export")):
+        return "ok"
+    return "info"
+
+
+# --------------------------------------------------------------------------------------------
+# Login (sin cambios funcionales; usa login_theme)
+# --------------------------------------------------------------------------------------------
 
 
 def login(c):
@@ -152,21 +230,98 @@ def login(c):
                     st.rerun()
 
 
+# --------------------------------------------------------------------------------------------
+# Inicio
+# --------------------------------------------------------------------------------------------
+
+
 def dashboard(c, token):
     c.auth.authorize(token)
+    _head("Panorama de revisión")
     st.title("Panorama de revisión")
     st.caption("West Wall · mediciones históricas · política híbrida provisional")
     metrics = c.reader.metrics()
-    columns = st.columns(3)
-    for i, (label, value) in enumerate(metrics.items()):
-        columns[i % 3].metric(label.capitalize(), f"{value:,}")
-    st.info("Las anomalías requieren revisión geotécnica y no constituyen predicciones de falla.")
-    if st.button("Revisar candidatos pendientes", type="primary"):
-        st.session_state.current_page = "Bandeja de revisión"
-        st.rerun()
     rows, episodes = c.reader.rows, c.reviews.listing(token)
+    n_prisms, n_rows, n_episodes = rows.prism_id.nunique(), len(rows), len(episodes)
+    pending = int(episodes.human_status.eq("Pendiente").sum())
+    interrupted = int(episodes.quality_interruption_flag.fillna(False).astype(bool).sum())
+    bad_prisms = int(rows.loc[~rows.model_eligible, "prism_id"].nunique())
+
+    main, side = st.columns([2.1, 1], gap="medium")
+    with main:
+        with st.container(key="gx_hero"):
+            theme.html(
+                '<div class="gx-eyebrow"><span class="gx-dot"></span>West Wall · Monitoreo activo</div>'
+                '<h2 class="gx-hero-title">Monitoreo inteligente.<br>Decisiones geotécnicas precisas.</h2>'
+                f'<p class="gx-hero-text">{n_episodes} episodios detectados sobre {n_prisms} prismas; '
+                f"{pending} esperan revisión geotécnica.</p>"
+            )
+            st.info("Las anomalías requieren revisión geotécnica y no constituyen predicciones de falla.")
+            if st.button("Revisar candidatos pendientes", type="primary"):
+                _go("Bandeja de revisión")
+        reviewed_all = n_episodes > 0 and pending == 0
+        _stepper(
+            [
+                ("Ingesta de prismas", f"{n_prisms} prismas · {n_rows:,} registros", "done" if n_rows else "now"),
+                ("Detección de anomalías", f"{n_episodes} episodios", "done" if n_episodes else "todo"),
+                ("Revisión geotécnica", f"{pending} pendientes", "done" if reviewed_all else "now"),
+                ("Auditoría y reporte", "Tras la revisión", "now" if reviewed_all else "todo"),
+            ]
+        )
+        _attention(
+            [
+                (
+                    "◔",
+                    "Episodios por revisar",
+                    "Dictamen del especialista pendiente",
+                    f"{pending} pendientes",
+                    "warn" if pending else "ok",
+                    "Ver episodios ↗",
+                    "Bandeja de revisión",
+                ),
+                (
+                    "◇",
+                    "Prismas con registros no evaluables",
+                    "La ausencia de datos no implica estabilidad",
+                    f"{bad_prisms} prismas",
+                    "warn" if bad_prisms else "ok",
+                    "Validar prismas ↗",
+                    "Prismas",
+                ),
+                (
+                    "▤",
+                    "Reporte general",
+                    "PDF, CSV o JSON con trazabilidad",
+                    "Disponible",
+                    "info",
+                    "Generar reporte ↗",
+                    "Reportes",
+                ),
+            ]
+        )
+    with side:
+        items = list(metrics.items())
+        with st.container(key="gx_kpis"):
+            for label, value in items[:3]:
+                st.metric(label.capitalize(), f"{value:,}")
+        with st.container(key="gx_status"):
+            _section("Resumen de estado")
+            for label, value in items[3:]:
+                st.metric(label.capitalize(), f"{value:,}")
+            theme.html(
+                '<div class="gx-badges">'
+                + theme.badge("Calculado", "ok")
+                + theme.badge("En revisión" if pending else "Revisión al día", "warn" if pending else "ok")
+                + theme.badge(
+                    "Sin interrupciones" if not interrupted else f"{interrupted} interrupciones",
+                    "ok" if not interrupted else "warn",
+                )
+                + "</div>"
+            )
+
     a, b = st.columns([1.4, 1])
-    with a:
+    with a, st.container(key="gx_card_daily"):
+        _section("Candidatos observados por fecha")
         daily = (
             rows.loc[rows.candidate_hybrid.fillna(False)]
             .groupby(rows.timestamp.dt.date)
@@ -174,57 +329,50 @@ def dashboard(c, token):
             .rename("Candidatos")
             .reset_index()
         )
-        st.plotly_chart(
-            px.bar(
-                daily,
-                x="timestamp",
-                y="Candidatos",
-                color_discrete_sequence=[COLORS["teal"]],
-                title="Candidatos observados por fecha",
-            ),
-            width="stretch",
-        )
-    with b:
+        fig = px.bar(daily, x="timestamp", y="Candidatos", color_discrete_sequence=[theme.PALETTE["teal"]])
+        st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
+    with b, st.container(key="gx_card_status"):
+        _section("Revisión humana")
         counts = (
             episodes.human_status.value_counts().rename_axis("Estado").reset_index(name="Episodios")
         )
-        st.plotly_chart(
-            px.bar(
-                counts,
-                x="Estado",
-                y="Episodios",
-                color_discrete_sequence=[COLORS["purple"]],
-                title="Revisión humana",
-            ),
-            width="stretch",
+        fig = px.bar(counts, x="Estado", y="Episodios", color_discrete_sequence=[theme.PALETTE["cyan"]])
+        st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
+    with st.container(key="gx_card_prism"):
+        _section("Episodios por prisma")
+        counts = (
+            episodes.groupby("prism_id")
+            .size()
+            .sort_values(ascending=False)
+            .rename("Episodios")
+            .reset_index()
         )
-    counts = (
-        episodes.groupby("prism_id")
-        .size()
-        .sort_values(ascending=False)
-        .rename("Episodios")
-        .reset_index()
-    )
-    st.plotly_chart(
-        px.bar(
-            counts,
-            x="prism_id",
-            y="Episodios",
-            color_discrete_sequence=[COLORS["blue"]],
-            title="Episodios por prisma",
-        ),
-        width="stretch",
-    )
+        fig = px.bar(counts, x="prism_id", y="Episodios", color_discrete_sequence=[theme.PALETTE["teal_2"]])
+        st.plotly_chart(theme.style_fig(fig, 320), width="stretch")
     st.caption(
         f"Evaluables: {int(rows.model_eligible.sum()):,} · No evaluables: {int((~rows.model_eligible).sum()):,} · Última medición: {rows.timestamp.max()} · Integridad comprobada al cargar."
     )
 
 
+# --------------------------------------------------------------------------------------------
+# Revisión (bandeja + detalle)
+# --------------------------------------------------------------------------------------------
+
+
 def episode_detail(c, token, episode_id):
     c.auth.authorize(token)
     episode = c.reader.episodes.loc[c.reader.episodes.episode_id.eq(episode_id)].iloc[0]
+    current = c.reviews.get(token, episode_id)
     st.subheader(f"Episodio · {episode.prism_id}")
     st.caption(episode_id)
+    state = current.get("status", "Pendiente")
+    theme.html(
+        '<div class="gx-badges">'
+        + theme.badge(state, "warn" if state == "Pendiente" else "ok")
+        + (theme.badge("Con coincidencia", "info") if episode.agreement_count > 0 else "")
+        + (theme.badge("Persistente", "info") if episode.union_mark_count >= 2 else "")
+        + "</div>"
+    )
     cols = st.columns(4)
     for col, label, value in zip(
         cols,
@@ -241,7 +389,8 @@ def episode_detail(c, token, episode_id):
     with st.expander("Resumen retrospectivo y trazabilidad"):
         st.json(json.loads(episode.to_json(date_format="iso")))
     rows = c.reader.prism_series(episode.prism_id)
-    st.plotly_chart(series(rows, episode), width="stretch")
+    with st.container(key="gx_card_series"):
+        st.plotly_chart(series(rows, episode), width="stretch")
     st.caption(
         "Los máximos y la duración final son retrospectivos. Base q99=4.4398; IF q99=0.5873. Scores en escalas distintas."
     )
@@ -263,9 +412,8 @@ def episode_detail(c, token, episode_id):
             ],
             hide_index=True,
         )
-    current = c.reviews.get(token, episode_id)
     st.subheader("Evaluación del especialista")
-    with st.form("review_form"):
+    with st.container(key="gx_dictamen"), st.form("review_form"):
         a, b = st.columns(2)
         status = a.selectbox(
             "Estado de revisión", STATUSES, index=STATUSES.index(current.get("status", "Pendiente"))
@@ -318,30 +466,44 @@ def _restore_review_selection(key, options):
 
 def inbox(c, token):
     c.auth.authorize(token)
+    _head("Bandeja de revisión")
     st.title("Bandeja de revisión")
     episodes = c.reviews.listing(token)
-    a, b, d = st.columns(3)
-    prism_options = ["Todos"] + sorted(episodes.prism_id.unique())
-    _restore_review_selection("inbox_prism", prism_options)
-    prism = a.selectbox("Prisma", prism_options, key="inbox_prism")
-    st.session_state.review_saved_inbox_prism = prism
-    status = b.selectbox("Estado", ["Todos"] + list(STATUSES))
-    query = d.text_input("Buscar identificador")
-    with st.expander("Filtros de evidencia y periodo"):
-        dates = st.date_input(
-            "Periodo",
-            value=(
-                episodes.start_timestamp.min().date(),
-                episodes.last_observed_timestamp.max().date(),
+    _stats(
+        [
+            ("Episodios", len(episodes), "info"),
+            ("Pendientes", int(episodes.human_status.eq("Pendiente").sum()), "warn"),
+            ("Revisados", int(episodes.human_status.eq("Revisado").sum()), "ok"),
+            (
+                "Con interrupción",
+                int(episodes.quality_interruption_flag.fillna(False).astype(bool).sum()),
+                "mute",
             ),
-        )
-        agreement = st.checkbox("Con coincidencia")
-        persistence = st.checkbox("Con persistencia")
-        quality = st.checkbox("Con interrupción por calidad")
-        policy = st.selectbox("Política", ["Todas", "hybrid", "union", "consensus", "persistence"])
-        reviewer = st.selectbox(
-            "Revisor", ["Todos"] + sorted(x for x in episodes.reviewer_id.unique() if x)
-        )
+        ]
+    )
+    with st.container(key="gx_filters"):
+        a, b, d = st.columns(3)
+        prism_options = ["Todos"] + sorted(episodes.prism_id.unique())
+        _restore_review_selection("inbox_prism", prism_options)
+        prism = a.selectbox("Prisma", prism_options, key="inbox_prism")
+        st.session_state.review_saved_inbox_prism = prism
+        status = b.selectbox("Estado", ["Todos"] + list(STATUSES))
+        query = d.text_input("Buscar identificador")
+        with st.expander("Filtros de evidencia y periodo"):
+            dates = st.date_input(
+                "Periodo",
+                value=(
+                    episodes.start_timestamp.min().date(),
+                    episodes.last_observed_timestamp.max().date(),
+                ),
+            )
+            agreement = st.checkbox("Con coincidencia")
+            persistence = st.checkbox("Con persistencia")
+            quality = st.checkbox("Con interrupción por calidad")
+            policy = st.selectbox("Política", ["Todas", "hybrid", "union", "consensus", "persistence"])
+            reviewer = st.selectbox(
+                "Revisor", ["Todos"] + sorted(x for x in episodes.reviewer_id.unique() if x)
+            )
     filtered = episodes.copy()
     if prism != "Todos":
         filtered = filtered.loc[filtered.prism_id.eq(prism)]
@@ -432,14 +594,27 @@ def inbox(c, token):
         episode_detail(c, token, selected)
 
 
+# --------------------------------------------------------------------------------------------
+# Vista espacial
+# --------------------------------------------------------------------------------------------
+
+
 def spatial_view(c, token):
     from gsreview.presentation.spatial_workspace import render_workspace
 
-    render_workspace(c, token)
+    _head("Vista espacial")
+    with st.container(key="gx_spatial"):
+        render_workspace(c, token)
+
+
+# --------------------------------------------------------------------------------------------
+# Prismas
+# --------------------------------------------------------------------------------------------
 
 
 def prisms(c, token):
     c.auth.authorize(token)
+    _head("Prismas")
     st.title("Detalle del prisma")
     chosen = st.selectbox("Prisma", sorted(c.reader.rows.prism_id.unique()), key="detail_prism")
     rows = c.reader.prism_series(chosen)
@@ -455,16 +630,16 @@ def prisms(c, token):
         f"Periodo: {rows.timestamp.min()} a {rows.timestamp.max()} | Coordenadas de la última observación; unidad original."
     )
     st.dataframe(rows.tail(1)[["easting", "northing", "rl"]], hide_index=True)
-    st.plotly_chart(series(rows), width="stretch")
-    st.plotly_chart(
-        px.line(
+    with st.container(key="gx_card_prism_series"):
+        st.plotly_chart(series(rows), width="stretch")
+    with st.container(key="gx_card_prism_rate"):
+        fig = px.line(
             rows,
             x="timestamp",
             y="movement_rate_mm_per_day",
             title="Tasa derivada de movimiento (mm/día) · mediciones irregulares",
-        ),
-        width="stretch",
-    )
+        )
+        st.plotly_chart(theme.style_fig(fig), width="stretch")
     st.caption(
         "Aceleración: no disponible como característica congelada; no se inventa ni se incorpora al modelo."
     )
@@ -483,57 +658,70 @@ def prisms(c, token):
     )
     st.dataframe(c.reviews.listing(token).query("prism_id == @chosen"), hide_index=True)
 
+    _section("Directorio de prismas", "Resumen de todos los prismas")
+    search = st.text_input("Buscar prisma", key="prism_directory_search")
+    everything = c.reader.rows
+    features = getattr(c.reader, "features", None)
+    if (
+        "movement_rate_mm_per_day" not in everything.columns
+        and "source_record_id" in everything.columns
+        and features is not None
+        and not features.empty
+        and {"source_record_id", "movement_rate_mm_per_day"} <= set(features.columns)
+    ):
+        everything = everything.merge(
+            features[["source_record_id", "movement_rate_mm_per_day"]].drop_duplicates("source_record_id"),
+            on="source_record_id",
+            how="left",
+        )
+    rate_col = "movement_rate_mm_per_day" if "movement_rate_mm_per_day" in everything.columns else None
+    everything = everything.assign(_tasa=everything[rate_col] if rate_col else 0.0)
+    directory = (
+        everything.groupby("prism_id")
+        .agg(
+            Mediciones=("timestamp", "size"),
+            Evaluables=("model_eligible", "sum"),
+            Ultima=("timestamp", "max"),
+            Tasa=("_tasa", lambda s: s.abs().max()),
+        )
+        .join(c.reviews.listing(token).groupby("prism_id").size().rename("Episodios"))
+        .fillna({"Episodios": 0, "Tasa": 0})
+        .reset_index()
+        .rename(columns={"prism_id": "Prisma", "Ultima": "Última medición", "Tasa": "Tasa máx. (mm/día)"})
+    )
+    if search:
+        directory = directory.loc[directory["Prisma"].astype(str).str.contains(search, regex=False)]
+    top = float(directory["Tasa máx. (mm/día)"].max()) if len(directory) else 1.0
+    st.dataframe(
+        directory,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Tasa máx. (mm/día)": st.column_config.ProgressColumn(
+                "Tasa máx. (mm/día)", format="%.2f", min_value=0.0, max_value=top or 1.0
+            )
+        },
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Calidad de datos
+# --------------------------------------------------------------------------------------------
+
 
 def quality_view(c, token):
     c.auth.authorize(token)
+    _head("Calidad de datos")
     st.title("Calidad y cobertura")
     rows = c.reader.rows
     bad = rows.loc[~rows.model_eligible]
-
-    st.subheader("Importación de mediciones externas")
-    st.caption(
-        "Carga un archivo CSV para validar su estructura y visualizar "
-        "sus mediciones. Los datos históricos no serán modificados."
+    _stats(
+        [
+            ("Registros totales", f"{len(rows):,}", "info"),
+            ("Evaluables", f"{int(rows.model_eligible.sum()):,}", "ok"),
+            ("No evaluables", f"{len(bad):,}", "warn" if len(bad) else "ok"),
+        ]
     )
-
-    with st.expander("Ver formato CSV requerido"):
-        st.code(
-            "source_record_id,prism_id,timestamp,easting,northing,"
-            "rl,movement_rate_mm_per_day,elapsed_hours\n"
-            "R001,P001,2026-11-09T10:00:00Z,"
-            "500000,8500000,1200,2.5,24",
-            language="csv",
-        )
-
-    uploaded_csv = st.file_uploader(
-        "Seleccionar archivo de mediciones CSV",
-        type=["csv"],
-        key="hu106_csv_upload",
-        max_upload_size=10,
-    )
-
-    if uploaded_csv is not None:
-        content = uploaded_csv.getvalue()
-
-        if len(content) > MAX_FILE_SIZE:
-            st.error("El archivo supera el límite de 10 MB.")
-        else:
-            try:
-                validated_data = validate_csv(content)
-            except ValidationError as exc:
-                st.error(f"Archivo rechazado: {exc}")
-            else:
-                st.success("Archivo CSV validado correctamente.")
-                st.metric("Registros importados para vista previa", len(validated_data))
-                st.metric("Prismas identificados", validated_data["prism_id"].nunique())
-                st.dataframe(validated_data.head(100), hide_index=True)
-                st.info(
-                    "Vista previa únicamente. Los registros no se han guardado "
-                    "ni incorporado al análisis histórico."
-                )
-
-    st.divider()
-
     st.metric("Registros no evaluables", len(bad))
     st.info(
         "Ausencia de datos no significa estabilidad. La calidad se conserva separada de las marcas estadísticas."
@@ -544,28 +732,16 @@ def quality_view(c, token):
         .reset_index(name="Registros")
     )
     st.dataframe(counts, hide_index=True)
-    counts = bad.groupby("prism_id").size().rename("Registros").reset_index()
-    st.plotly_chart(
-        px.bar(
-            counts,
-            x="prism_id",
-            y="Registros",
-            color_discrete_sequence=[COLORS["gray"]],
-            title="No evaluables por prisma",
-        ),
-        width="stretch",
-    )
-    counts = bad.groupby(bad.timestamp.dt.date).size().rename("Registros").reset_index()
-    st.plotly_chart(
-        px.bar(
-            counts,
-            x="timestamp",
-            y="Registros",
-            color_discrete_sequence=[COLORS["gray"]],
-            title="No evaluables por fecha",
-        ),
-        width="stretch",
-    )
+    with st.container(key="gx_card_bad_prism"):
+        _section("No evaluables por prisma")
+        counts = bad.groupby("prism_id").size().rename("Registros").reset_index()
+        fig = px.bar(counts, x="prism_id", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]])
+        st.plotly_chart(theme.style_fig(fig), width="stretch")
+    with st.container(key="gx_card_bad_date"):
+        _section("No evaluables por fecha")
+        counts = bad.groupby(bad.timestamp.dt.date).size().rename("Registros").reset_index()
+        fig = px.bar(counts, x="timestamp", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]])
+        st.plotly_chart(theme.style_fig(fig), width="stretch")
     st.dataframe(
         bad[
             [
@@ -681,32 +857,59 @@ def _render_synthetic_panel(c, token):
             )
 
 
+# --------------------------------------------------------------------------------------------
+# Reportes
+# --------------------------------------------------------------------------------------------
+
+
 def report_view(c, token):
     c.auth.authorize(token, "export")
+    _head("Reportes")
     st.title("Reportes y trazabilidad")
-    scope = st.selectbox("Tipo de reporte", ["general", "episodio", "prisma"])
-    object_id = ""
-    if scope == "episodio":
-        object_id = st.selectbox("Episodio", c.reader.episodes.episode_id.tolist())
-    if scope == "prisma":
-        object_id = st.selectbox("Prisma", sorted(c.reader.rows.prism_id.unique()))
-    fmt = st.radio("Formato", ["PDF", "CSV", "JSON"], horizontal=True)
-    signature = (scope, object_id, fmt)
-    if st.button("Generar reporte", type="primary"):
-        st.session_state.export_ready = (signature, c.reports.generate(token, *signature))
-    prepared = st.session_state.get("export_ready")
-    if prepared and prepared[0] == signature:
-        mime = {"PDF": "application/pdf", "CSV": "text/csv", "JSON": "application/json"}[fmt]
-        st.download_button(
-            "Descargar reporte", prepared[1], file_name=f"GeoSlope_{scope}.{fmt.lower()}", mime=mime
-        )
+    theme.html(
+        '<div class="gx-formats">'
+        '<div class="gx-format"><b>PDF</b><span>Informe legible para revisión y archivo</span></div>'
+        '<div class="gx-format"><b>CSV</b><span>Tabla plana para análisis externo</span></div>'
+        '<div class="gx-format"><b>JSON</b><span>Estructura completa con trazabilidad</span></div>'
+        "</div>"
+    )
+    with st.container(key="gx_report"):
+        scope = st.selectbox("Tipo de reporte", ["general", "episodio", "prisma"])
+        object_id = ""
+        if scope == "episodio":
+            object_id = st.selectbox("Episodio", c.reader.episodes.episode_id.tolist())
+        if scope == "prisma":
+            object_id = st.selectbox("Prisma", sorted(c.reader.rows.prism_id.unique()))
+        fmt = st.radio("Formato", ["PDF", "CSV", "JSON"], horizontal=True)
+        signature = (scope, object_id, fmt)
+        if st.button("Generar reporte", type="primary"):
+            st.session_state.export_ready = (signature, c.reports.generate(token, *signature))
+        prepared = st.session_state.get("export_ready")
+        if prepared and prepared[0] == signature:
+            mime = {"PDF": "application/pdf", "CSV": "text/csv", "JSON": "application/json"}[fmt]
+            st.download_button(
+                "Descargar reporte", prepared[1], file_name=f"GeoSlope_{scope}.{fmt.lower()}", mime=mime
+            )
     st.info(NOTICE)
+
+
+# --------------------------------------------------------------------------------------------
+# Usuarios
+# --------------------------------------------------------------------------------------------
 
 
 def users_view(c, token):
     c.auth.authorize(token, "users")
+    _head("Usuarios")
     st.title("Usuarios y permisos")
     accounts = c.auth.safe_users(token)
+    _stats(
+        [
+            ("Cuentas", len(accounts), "info"),
+            ("Activas", sum(1 for u in accounts if u.get("active")), "ok"),
+            ("Administradores", sum(1 for u in accounts if u.get("role") == "administrador"), "mute"),
+        ]
+    )
     st.dataframe(pd.DataFrame(accounts), hide_index=True)
     with st.expander("Crear usuario"):
         with st.form("new_user"):
@@ -747,7 +950,13 @@ def users_view(c, token):
             st.success("Preferencia guardada. Los parámetros analíticos permanecen congelados.")
 
 
+# --------------------------------------------------------------------------------------------
+# Auditoría
+# --------------------------------------------------------------------------------------------
+
+
 def audit_view(c, token):
+    _head("Auditoría")
     st.title("Auditoría")
     data = pd.DataFrame(c.reviews.audit(token))
     if data.empty:
@@ -757,6 +966,16 @@ def audit_view(c, token):
         if action != "Todos":
             data = data.loc[data.action.eq(action)]
         data["fecha_utc"] = pd.to_datetime(data.timestamp, unit="s", utc=True)
+        recent = data.sort_values("fecha_utc", ascending=False).head(6)
+        items = "".join(
+            f"<li>{theme.badge(r.action, _tone(r.action))}<b> {escape(str(r.actor))}</b>"
+            f"<em>{r.fecha_utc:%Y-%m-%d %H:%M} UTC</em><p>{escape(str(r.detail))}</p></li>"
+            for r in recent.itertuples()
+        )
+        theme.html(
+            '<div class="gx-card"><div class="gx-section"><h3>Actividad reciente</h3>'
+            f'<span>Últimos {len(recent)} eventos</span></div><ul class="gx-timeline">{items}</ul></div>'
+        )
         st.dataframe(
             data[["fecha_utc", "actor", "action", "object_id", "detail"]],
             hide_index=True,
@@ -767,8 +986,14 @@ def audit_view(c, token):
     )
 
 
+# --------------------------------------------------------------------------------------------
+# Copias de seguridad y perfil
+# --------------------------------------------------------------------------------------------
+
+
 def backups_view(c, token):
     c.auth.authorize(token, "backup")
+    _head("Copias de seguridad")
     st.title("Copias de seguridad cifradas")
     st.write(
         "Las copias requieren la misma clave local. Guarda una copia de la clave por separado, en un medio protegido."
@@ -794,6 +1019,7 @@ def backups_view(c, token):
 
 def profile(c, token):
     actor = c.auth.authorize(token, "profile")
+    _head("Mi perfil")
     st.title("Mi perfil")
     st.write(f"{actor['display_name']} · {actor['username']} · {actor['role']}")
     if actor["force_change"]:
