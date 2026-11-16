@@ -35,6 +35,7 @@ def _clear(last_date):
         "sx_search": "",
         "sx_state": "Todos",
         "sx_candidates": False,
+        "sx_prisms": [],
         "sx_labels": False,
         "sx_dimension": "3D",
         "sx_terrain": False,
@@ -43,6 +44,18 @@ def _clear(last_date):
     st.session_state.sx_focus = False
     st.session_state.sx_camera_revision = st.session_state.get("sx_camera_revision", 0) + 1
 
+def _visible_state_summary(points):
+    counts = points["causal_state"].value_counts()
+
+    return {
+        "Candidato para revisión": int(counts.get("candidato_revision", 0)),
+        "Marca estadística": int(
+            counts.get("marca_aislada", 0)
+            + counts.get("episodio_en_observacion", 0)
+        ),
+        "No evaluable": int(counts.get("no_evaluable", 0)),
+        "Sin marca": int(counts.get("sin_marca", 0)),
+    }
 
 def render_workspace(c, token):
     actor = c.auth.authorize(token, "read")
@@ -125,7 +138,11 @@ def _render_content(c, token):
         candidates = columns[3].toggle(
             "Solo candidatos", key="sx_candidates", disabled=terrain_active
         )
-        labels = columns[4].toggle("Etiquetas", key="sx_labels", disabled=terrain_active)
+        labels = columns[4].toggle(
+            "Mostrar identificadores",
+            key="sx_labels",
+            disabled=terrain_active,
+        )
         dimension = (
             columns[5].segmented_control(
                 "Vista", ["2D", "3D"], default="3D", key="sx_dimension", selection_mode="single"
@@ -139,6 +156,27 @@ def _render_content(c, token):
             key="sx_clear",
             on_click=_clear,
             args=(last,),
+        )
+        prism_options = sorted(
+            c.reader.rows.prism_id.dropna().unique().tolist()
+        )
+
+        prism_columns = st.columns([4, 1], vertical_alignment="bottom", gap="small")
+
+        selected_prisms = prism_columns[0].multiselect(
+            "Prismas a visualizar",
+            options=prism_options,
+            placeholder="Todos los prismas",
+            key="sx_prisms",
+            disabled=terrain_active,
+        )
+
+        prism_columns[1].button(
+            "Mostrar todos",
+            key="sx_clear_prisms",
+            disabled=terrain_active or not selected_prisms,
+            on_click=lambda: st.session_state.update({"sx_prisms": []}),
+            width="stretch",
         )
     if st.toggle(
         "Mostrar relieve de Century Mine",
@@ -156,14 +194,27 @@ def _render_content(c, token):
     )
     cutoff = pd.Timestamp(datetime.combine(day, time.max))
     points = service.points(token, cutoff)
-    visible = filter_points(points, search, state, candidates)
+    visible = filter_points(
+        points,
+        search,
+        state,
+        candidates,
+        selected_prisms,
+    )
     if visible.empty:
         with st.container(key="spatial_empty"):
             st.info(
-                "No existen prismas con los filtros aplicados. Cambia la fecha o pulsa Limpiar filtros."
+                "No hay puntos disponibles para visualizar con los criterios actuales."
             )
             st.caption(
-                "Selecciona un prisma para consultar sus mediciones. No se añade ninguna posición artificial."
+                "Puedes modificar los filtros o restablecerlos para recuperar la vista completa de prismas."
+            )
+            st.button(
+                "Restablecer filtros",
+                key="sx_empty_clear",
+                icon=":material/restart_alt:",
+                on_click=_clear,
+                args=(last,),
             )
         return
     valid_ids = sorted(visible.prism_id.unique())
@@ -181,6 +232,14 @@ def _render_content(c, token):
         with st.container(key="spatial_scene_panel"):
             plot_title, plot_reset = st.columns([5, 1], vertical_alignment="center")
             plot_title.markdown("**Ubicaciones instrumentales · datos originales**")
+            summary = _visible_state_summary(visible)
+            plot_title.caption(
+                f"Puntos visibles: {len(visible)} · "
+                + " · ".join(
+                    f"{label}: {count}"
+                    for label, count in summary.items()
+                )
+            )
             if plot_reset.button(
                 "Vista completa", key="sx_reset_camera", help="Restablecer cámara", width="stretch"
             ):
@@ -200,7 +259,12 @@ def _render_content(c, token):
                 title=None,
                 height=540,
                 margin={"l": 10, "r": 10, "t": 20, "b": 85},
-                legend={"orientation": "h", "y": -0.16},
+                legend={
+                    "title": {"text": "Estados de los prismas"},
+                    "orientation": "h",
+                    "y": -0.16,
+                    "x": 0,
+                },
                 uirevision=str(st.session_state.get("sx_camera_revision", 0)) + dimension,
             )
             if dimension == "3D" and not st.session_state.get("sx_focus", False):

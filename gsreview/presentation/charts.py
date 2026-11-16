@@ -114,7 +114,15 @@ def spatial(points, dimension="3D", colors=None, selected=None, focus=False, lab
         "marca_aislada": COLORS["spatial_selected"],
         "candidato_revision": COLORS["spatial_agreement"],
     }
+
     fig = go.Figure()
+
+    mark_count = int(
+        points.causal_state.isin(
+            ["marca_aislada", "episodio_en_observacion"]
+        ).sum()
+    )
+
     for state, group in points.groupby("causal_state"):
         custom = (
             group[["prism_id", "timestamp", "model_eligible", "episode_id"]].astype(str).to_numpy()
@@ -126,9 +134,9 @@ def spatial(points, dimension="3D", colors=None, selected=None, focus=False, lab
             textfont={"size": 11, "color": COLORS["spatial_text"]},
             customdata=custom,
             name=(
-                "Marca estadística"
+                f"Marca estadística ({mark_count})"
                 if state in ("marca_aislada", "episodio_en_observacion")
-                else STATE_LABELS[state]
+                else f"{STATE_LABELS[state]} ({len(group)})"
             ),
             legendgroup=(
                 "mark" if state in ("marca_aislada", "episodio_en_observacion") else state

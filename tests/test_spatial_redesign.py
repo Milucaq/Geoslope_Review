@@ -20,7 +20,98 @@ def test_filters_preserve_coordinates_and_candidates(app):
         .all()
     )
 
+def test_filter_points_supports_single_and_multiple_prism_selection(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
 
+    single = filter_points(
+        points,
+        selected_prisms=["30-1994"],
+    )
+    assert single.prism_id.unique().tolist() == ["30-1994"]
+
+    selected = ["22-1917", "30-1994", "31-1991"]
+    multiple = filter_points(
+        points,
+        selected_prisms=selected,
+    )
+
+    assert set(multiple.prism_id.unique()) == set(selected)
+    pd.testing.assert_frame_equal(
+        multiple,
+        points.loc[points.prism_id.isin(selected)],
+    )
+
+
+def test_filter_points_empty_selection_preserves_all_points(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
+
+    filtered = filter_points(
+        points,
+        selected_prisms=[],
+    )
+
+    pd.testing.assert_frame_equal(filtered, points)
+
+
+def test_prism_selection_combines_with_existing_filters(app):
+    points = app.reader.spatial("2014-02-20 23:59:59")
+
+    candidate_ids = (
+        points.loc[points.candidate_hybrid.fillna(False), "prism_id"]
+        .drop_duplicates()
+        .tolist()
+    )
+
+    selected = candidate_ids[:2]
+
+    filtered = filter_points(
+        points,
+        only_candidates=True,
+        selected_prisms=selected,
+    )
+
+    assert filtered.candidate_hybrid.fillna(False).all()
+    assert set(filtered.prism_id.unique()).issubset(set(selected))
+
+def test_workspace_prism_multiselect_filters_and_restores_view(app, monkeypatch):
+    monkeypatch.setenv("GEOSLOPE_RUNTIME", str(app.runtime))
+
+    points = app.reader.spatial("2014-02-20 23:59:59")
+    selected = sorted(points.prism_id.unique().tolist())[:2]
+
+    at = AppTest.from_file(str(app.app_root / "app.py"), default_timeout=40)
+    at.session_state["token"] = app.test_admin
+    at.session_state["nav"] = "Vista espacial"
+    at.run()
+
+    assert not at.exception and not at.error
+
+    prism_filter = at.multiselect(key="sx_prisms")
+    assert prism_filter.value == []
+
+    prism_filter.set_value(selected).run()
+
+    assert not at.exception and not at.error
+    assert set(at.multiselect(key="sx_prisms").value) == set(selected)
+
+    real_prism_ids = set(points.prism_id.unique())
+
+    visible_options = {
+        value
+        for value in at.selectbox(key="sx_selected").options
+        if value in real_prism_ids
+    }
+    assert visible_options == set(selected)
+
+    at.button(key="sx_clear_prisms").click().run()
+
+    restored_options = {
+        value
+        for value in at.selectbox(key="sx_selected").options
+        if value in real_prism_ids
+    }
+    assert restored_options == real_prism_ids
+    
 def test_click_event_rejects_invented_id_duplicates_and_invalid_camera():
     assert accept_selection(
         {"prism_id": "22-1917", "nonce": 1, "camera": None}, ["22-1917"], None

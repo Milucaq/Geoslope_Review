@@ -71,7 +71,10 @@ def test_terrain_switch_preserves_prisms_and_works_with_empty_filter(app, monkey
     at.toggle(key="sx_terrain").set_value(False).run()
     assert at.selectbox(key="sx_selected").value == "22-1917"
     at.text_input(key="sx_search").set_value("SIN-PRISMA").run()
-    assert any("No existen prismas" in x.value for x in at.info)
+    assert any(
+        "No hay puntos disponibles para visualizar con los criterios actuales." in x.value
+        for x in at.info
+    )
     at.toggle(key="sx_terrain").set_value(True).run()
     assert not at.exception and not at.error
     assert any("alineación" in x.value for x in at.info)

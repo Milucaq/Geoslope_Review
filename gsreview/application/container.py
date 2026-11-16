@@ -11,6 +11,7 @@ from gsreview.application.review import ReviewService
 from gsreview.application.reports import ReportService
 from gsreview.application.backup import BackupService
 from gsreview.application.settings import SettingsService
+from gsreview.application.synthetic import SyntheticService
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,7 +19,12 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 class Container:
     def __init__(self, runtime=None, source=None, clock=None):
         self.app_root = APP_ROOT
-        self.source = Path(source or os.environ.get("GEOSLOPE_SOURCE", APP_ROOT.parent)).resolve()
+        default_source = (
+            APP_ROOT.parent
+            if (APP_ROOT.parent / "config/phase5.json").is_file()
+            else APP_ROOT / "ci_artifacts"
+        )
+        self.source = Path(source or os.environ.get("GEOSLOPE_SOURCE", default_source)).resolve()
         self.runtime = Path(
             runtime or os.environ.get("GEOSLOPE_RUNTIME", APP_ROOT / "data/runtime")
         ).resolve()
@@ -34,3 +40,4 @@ class Container:
         self.reports = ReportService(self.auth, self.reader, self.reviews)
         self.backups = BackupService(self.auth, self.reader, self.runtime / "backups")
         self.settings = SettingsService(self.auth)
+        self.synthetic = SyntheticService(self.auth)

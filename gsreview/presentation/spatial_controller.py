@@ -11,13 +11,32 @@ FILTERS = {
 }
 
 
-def filter_points(points, search="", state="Todos", only_candidates=False):
-    result = points.loc[points.prism_id.str.contains(search.strip(), case=False, regex=False)]
+def filter_points(
+    points,
+    search="",
+    state="Todos",
+    only_candidates=False,
+    selected_prisms=None,
+):
+    result = points.loc[
+        points.prism_id.str.contains(
+            search.strip(),
+            case=False,
+            regex=False,
+        )
+    ]
+
+    selected_prisms = selected_prisms or []
+    if selected_prisms:
+        result = result.loc[result.prism_id.isin(selected_prisms)]
+
     states = FILTERS.get(state)
     if states is not None:
         result = result.loc[result.causal_state.isin(states)]
+
     if only_candidates:
         result = result.loc[result.candidate_hybrid.fillna(False)]
+
     return result
 
 
