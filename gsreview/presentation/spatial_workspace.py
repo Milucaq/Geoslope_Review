@@ -90,7 +90,21 @@ def render_workspace(c, token):
                     st.session_state.clear()
                     st.rerun()
                 st.toggle("Mostrar ficha", key="sx_detail", value=True)
-        _render_body(c, token)
+        source_type = st.radio(
+            "Fuente de datos",
+            ["Datos originales", "Datos externos"],
+            horizontal=True,
+            key="hu110_source_type",
+        )
+
+        if source_type == "Datos externos":
+            from gsreview.presentation.external_spatial_workspace import (
+                render_external_workspace,
+            )
+
+            render_external_workspace()
+        else:
+            _render_body(c, token)
 
 
 @st.fragment
