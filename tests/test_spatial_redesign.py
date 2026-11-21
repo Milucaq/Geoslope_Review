@@ -149,12 +149,49 @@ def test_no_arbitrary_selection_and_linked_histories(app, monkeypatch):
     assert at.selectbox(key="sx_selected").value is None
     at.selectbox(key="sx_selected").set_value("30-1994").run()
     assert any(x.value == "Prisma 30-1994" for x in at.subheader)
-    assert at.metric[1].value == "15"
+    metrics = {metric.label: metric.value for metric in at.metric}
+    assert metrics["Candidatos"] == "15"
     at.button(key="sx_history").click().run()
     assert (
         at.session_state["nav"] == "Prismas" and at.selectbox(key="detail_prism").value == "30-1994"
     )
 
+def test_selected_prism_shows_measurement_detail_and_preserves_data(app, monkeypatch):
+    monkeypatch.setenv("GEOSLOPE_RUNTIME", str(app.runtime))
+
+    chosen = "30-1994"
+    cutoff = pd.Timestamp(app.reader.rows.timestamp.max())
+
+    service = SpatialService(app)
+    rows = service.series(app.test_admin, chosen, cutoff)
+
+    assert not rows.empty
+
+    latest = rows.iloc[-1]
+    before = app.reader.rows.copy(deep=True)
+
+    at = AppTest.from_file(str(app.app_root / "app.py"), default_timeout=40)
+    at.session_state["token"] = app.test_admin
+    at.session_state["nav"] = "Vista espacial"
+    at.run()
+
+    at.selectbox(key="sx_selected").set_value(chosen).run()
+
+    assert not at.exception and not at.error
+    assert any(x.value == f"Prisma {chosen}" for x in at.subheader)
+
+    metrics = {metric.label: metric.value for metric in at.metric}
+
+    assert metrics["Fecha"] == str(latest.timestamp)
+
+    movement = latest.reported_3d_movement_mm
+    expected_movement = (
+        "Sin dato" if pd.isna(movement) else f"{movement:.2f} mm"
+    )
+
+    assert metrics["Desplazamiento"] == expected_movement
+
+    assert app.reader.rows.equals(before)
 
 def test_review_action_opens_same_prism_episode(app, monkeypatch):
     monkeypatch.setenv("GEOSLOPE_RUNTIME", str(app.runtime))

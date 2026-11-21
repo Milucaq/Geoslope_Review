@@ -334,15 +334,28 @@ def _render_detail(c, token, service, chosen, visible, cutoff):
         + "".join(
             f"<tr><td>{axis}</td><td>{value:.4f}</td></tr>"
             for axis, value in (
-                ("Easting", location.easting),
-                ("Northing", location.northing),
-                ("RL", location.rl),
-            )
+                ("Este", location.easting),
+                ("Norte", location.northing),
+                ("Elevación", location.rl),
+                            )
         )
         + "</table>"
     )
     st.html(table)
-    st.caption("Última observación: " + str(location.timestamp))
+    st.markdown("**Última medición disponible**")
+    measurement_date, measurement_value = st.columns(2)
+
+    measurement_date.metric(
+        "Fecha",
+        str(latest.timestamp),
+    )
+
+    movement = latest.reported_3d_movement_mm
+
+    measurement_value.metric(
+        "Desplazamiento",
+        "Sin dato" if pd.isna(movement) else f"{movement:.2f} mm",
+    )
     ep_ids = rows.loc[rows.episode_id.ne(""), "episode_id"].unique().tolist()
     candidate_rows = rows.loc[rows.candidate_hybrid.fillna(False)]
     a, b = st.columns(2)
