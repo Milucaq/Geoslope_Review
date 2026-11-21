@@ -342,20 +342,19 @@ def _render_detail(c, token, service, chosen, visible, cutoff):
         + "</table>"
     )
     st.html(table)
+
     st.markdown("**Última medición disponible**")
-    measurement_date, measurement_value = st.columns(2)
 
-    measurement_date.metric(
-        "Fecha",
-        str(latest.timestamp),
-    )
+    # Fecha completa de la última medición
+    st.markdown(f"**Fecha:** {latest.timestamp}")
 
+    # Desplazamiento reportado, conservando el valor original
     movement = latest.reported_3d_movement_mm
+    movement_text = "Sin dato" if pd.isna(movement) else f"{movement:.2f} mm"
 
-    measurement_value.metric(
-        "Desplazamiento",
-        "Sin dato" if pd.isna(movement) else f"{movement:.2f} mm",
-    )
+    st.markdown(f"**Desplazamiento:** {movement_text}")
+
+
     ep_ids = rows.loc[rows.episode_id.ne(""), "episode_id"].unique().tolist()
     candidate_rows = rows.loc[rows.candidate_hybrid.fillna(False)]
     a, b = st.columns(2)

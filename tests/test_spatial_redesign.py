@@ -180,16 +180,16 @@ def test_selected_prism_shows_measurement_detail_and_preserves_data(app, monkeyp
     assert not at.exception and not at.error
     assert any(x.value == f"Prisma {chosen}" for x in at.subheader)
 
-    metrics = {metric.label: metric.value for metric in at.metric}
+    markdown_values = [element.value for element in at.markdown]
 
-    assert metrics["Fecha"] == str(latest.timestamp)
+    assert f"**Fecha:** {latest.timestamp}" in markdown_values
 
     movement = latest.reported_3d_movement_mm
     expected_movement = (
         "Sin dato" if pd.isna(movement) else f"{movement:.2f} mm"
     )
 
-    assert metrics["Desplazamiento"] == expected_movement
+    assert f"**Desplazamiento:** {expected_movement}" in markdown_values
 
     assert app.reader.rows.equals(before)
 
