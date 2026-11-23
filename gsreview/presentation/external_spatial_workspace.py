@@ -1,4 +1,4 @@
-﻿"""Vista temporal de prismas importados desde CSV."""
+"""Vista temporal de prismas importados desde CSV."""
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -32,7 +32,11 @@ def render_external_workspace():
         if len(content) > MAX_FILE_SIZE:
             raise ValidationError("El archivo supera el límite de 10 MB.")
 
-        validated = validate_csv(content)
+        validated = validate_csv(
+            content,
+            filename=getattr(uploaded, "name", None),
+            content_type=getattr(uploaded, "type", None),
+        )
         points, invalid_count = prepare_external_points(validated)
     except ValidationError as error:
         st.error(f"CSV rechazado: {error}")
@@ -41,20 +45,21 @@ def render_external_workspace():
     st.success("Archivo validado correctamente.")
 
     if invalid_count:
-        st.warning(
-            f"Se omitieron {invalid_count} mediciones con coordenadas inválidas."
-        )
+        st.warning(f"Se omitieron {invalid_count} mediciones con coordenadas inválidas.")
 
     first, second = st.columns(2)
     first.metric("Mediciones validadas", len(validated))
     second.metric("Prismas visualizados", len(points))
 
-    dimension = st.segmented_control(
-        "Dimensión",
-        ["2D", "3D"],
-        default="3D",
-        key="hu110_dimension",
-    ) or "3D"
+    dimension = (
+        st.segmented_control(
+            "Dimensión",
+            ["2D", "3D"],
+            default="3D",
+            key="hu110_dimension",
+        )
+        or "3D"
+    )
 
     prism_ids = sorted(points["prism_id"].astype(str).unique().tolist())
     chosen = st.selectbox(
@@ -63,15 +68,9 @@ def render_external_workspace():
         key="hu110_prism",
     )
 
-    visible = (
-        points
-        if chosen == "Todos"
-        else points.loc[points["prism_id"].astype(str).eq(chosen)]
-    )
+    visible = points if chosen == "Todos" else points.loc[points["prism_id"].astype(str).eq(chosen)]
 
-    custom = visible[
-        ["prism_id", "timestamp", "movement_rate_mm_per_day"]
-    ].astype(str).to_numpy()
+    custom = visible[["prism_id", "timestamp", "movement_rate_mm_per_day"]].astype(str).to_numpy()
 
     common = {
         "mode": "markers+text",
