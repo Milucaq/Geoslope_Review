@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from gsreview.application.csv_import import MAX_FILE_SIZE, validate_csv
 from gsreview.domain.rules import (
     STATUSES,
     RELEVANCE,
@@ -144,7 +145,10 @@ def login(c):
             else "Introduce la clave de instalación para continuar."
         )
     else:
-        title, subtitle = "Bienvenido", "Ingresa con tu usuario y contraseña para acceder a la plataforma."
+        title, subtitle = (
+            "Bienvenido",
+            "Ingresa con tu usuario y contraseña para acceder a la plataforma.",
+        )
 
     with st.container(key="gs_login_root"):
         st.markdown(login_css(), unsafe_allow_html=True)
@@ -166,13 +170,23 @@ def login(c):
                     return
 
                 with st.form("bootstrap"):
-                    username = st.text_input("Usuario", key="setup_username", placeholder="Ej. admin")
-                    name = st.text_input("Nombre visible", key="setup_name", placeholder="Nombre y apellido")
+                    username = st.text_input(
+                        "Usuario", key="setup_username", placeholder="Ej. admin"
+                    )
+                    name = st.text_input(
+                        "Nombre visible", key="setup_name", placeholder="Nombre y apellido"
+                    )
                     password = st.text_input(
-                        "Contraseña", type="password", key="setup_password", placeholder="Mínimo 12 caracteres"
+                        "Contraseña",
+                        type="password",
+                        key="setup_password",
+                        placeholder="Mínimo 12 caracteres",
                     )
                     repeat = st.text_input(
-                        "Repetir contraseña", type="password", key="setup_repeat", placeholder="Repite la contraseña"
+                        "Repetir contraseña",
+                        type="password",
+                        key="setup_repeat",
+                        placeholder="Repite la contraseña",
                     )
                     st.caption(
                         "12 caracteres como mínimo; mayúscula, minúscula, número y símbolo; sin tu usuario."
@@ -187,9 +201,14 @@ def login(c):
                         st.rerun()
             elif "challenge" not in st.session_state:
                 with st.form("login"):
-                    username = st.text_input("Usuario", key="login_username", placeholder="Tu nombre de usuario")
+                    username = st.text_input(
+                        "Usuario", key="login_username", placeholder="Tu nombre de usuario"
+                    )
                     password = st.text_input(
-                        "Contraseña", type="password", key="login_password", placeholder="Tu contraseña"
+                        "Contraseña",
+                        type="password",
+                        key="login_password",
+                        placeholder="Tu contraseña",
                     )
                     if st.form_submit_button("Iniciar sesión", type="primary"):
                         challenge, stage = c.auth.password_step(username, password)
@@ -256,14 +275,24 @@ def dashboard(c, token):
                 f'<p class="gx-hero-text">{n_episodes} episodios detectados sobre {n_prisms} prismas; '
                 f"{pending} esperan revisión geotécnica.</p>"
             )
-            st.info("Las anomalías requieren revisión geotécnica y no constituyen predicciones de falla.")
+            st.info(
+                "Las anomalías requieren revisión geotécnica y no constituyen predicciones de falla."
+            )
             if st.button("Revisar candidatos pendientes", type="primary"):
                 _go("Bandeja de revisión")
         reviewed_all = n_episodes > 0 and pending == 0
         _stepper(
             [
-                ("Ingesta de prismas", f"{n_prisms} prismas · {n_rows:,} registros", "done" if n_rows else "now"),
-                ("Detección de anomalías", f"{n_episodes} episodios", "done" if n_episodes else "todo"),
+                (
+                    "Ingesta de prismas",
+                    f"{n_prisms} prismas · {n_rows:,} registros",
+                    "done" if n_rows else "now",
+                ),
+                (
+                    "Detección de anomalías",
+                    f"{n_episodes} episodios",
+                    "done" if n_episodes else "todo",
+                ),
                 ("Revisión geotécnica", f"{pending} pendientes", "done" if reviewed_all else "now"),
                 ("Auditoría y reporte", "Tras la revisión", "now" if reviewed_all else "todo"),
             ]
@@ -311,7 +340,9 @@ def dashboard(c, token):
             theme.html(
                 '<div class="gx-badges">'
                 + theme.badge("Calculado", "ok")
-                + theme.badge("En revisión" if pending else "Revisión al día", "warn" if pending else "ok")
+                + theme.badge(
+                    "En revisión" if pending else "Revisión al día", "warn" if pending else "ok"
+                )
                 + theme.badge(
                     "Sin interrupciones" if not interrupted else f"{interrupted} interrupciones",
                     "ok" if not interrupted else "warn",
@@ -329,14 +360,18 @@ def dashboard(c, token):
             .rename("Candidatos")
             .reset_index()
         )
-        fig = px.bar(daily, x="timestamp", y="Candidatos", color_discrete_sequence=[theme.PALETTE["teal"]])
+        fig = px.bar(
+            daily, x="timestamp", y="Candidatos", color_discrete_sequence=[theme.PALETTE["teal"]]
+        )
         st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
     with b, st.container(key="gx_card_status"):
         _section("Revisión humana")
         counts = (
             episodes.human_status.value_counts().rename_axis("Estado").reset_index(name="Episodios")
         )
-        fig = px.bar(counts, x="Estado", y="Episodios", color_discrete_sequence=[theme.PALETTE["cyan"]])
+        fig = px.bar(
+            counts, x="Estado", y="Episodios", color_discrete_sequence=[theme.PALETTE["cyan"]]
+        )
         st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
     with st.container(key="gx_card_prism"):
         _section("Episodios por prisma")
@@ -347,7 +382,9 @@ def dashboard(c, token):
             .rename("Episodios")
             .reset_index()
         )
-        fig = px.bar(counts, x="prism_id", y="Episodios", color_discrete_sequence=[theme.PALETTE["teal_2"]])
+        fig = px.bar(
+            counts, x="prism_id", y="Episodios", color_discrete_sequence=[theme.PALETTE["teal_2"]]
+        )
         st.plotly_chart(theme.style_fig(fig, 320), width="stretch")
     st.caption(
         f"Evaluables: {int(rows.model_eligible.sum()):,} · No evaluables: {int((~rows.model_eligible).sum()):,} · Última medición: {rows.timestamp.max()} · Integridad comprobada al cargar."
@@ -500,7 +537,9 @@ def inbox(c, token):
             agreement = st.checkbox("Con coincidencia")
             persistence = st.checkbox("Con persistencia")
             quality = st.checkbox("Con interrupción por calidad")
-            policy = st.selectbox("Política", ["Todas", "hybrid", "union", "consensus", "persistence"])
+            policy = st.selectbox(
+                "Política", ["Todas", "hybrid", "union", "consensus", "persistence"]
+            )
             reviewer = st.selectbox(
                 "Revisor", ["Todos"] + sorted(x for x in episodes.reviewer_id.unique() if x)
             )
@@ -670,11 +709,15 @@ def prisms(c, token):
         and {"source_record_id", "movement_rate_mm_per_day"} <= set(features.columns)
     ):
         everything = everything.merge(
-            features[["source_record_id", "movement_rate_mm_per_day"]].drop_duplicates("source_record_id"),
+            features[["source_record_id", "movement_rate_mm_per_day"]].drop_duplicates(
+                "source_record_id"
+            ),
             on="source_record_id",
             how="left",
         )
-    rate_col = "movement_rate_mm_per_day" if "movement_rate_mm_per_day" in everything.columns else None
+    rate_col = (
+        "movement_rate_mm_per_day" if "movement_rate_mm_per_day" in everything.columns else None
+    )
     everything = everything.assign(_tasa=everything[rate_col] if rate_col else 0.0)
     directory = (
         everything.groupby("prism_id")
@@ -687,7 +730,13 @@ def prisms(c, token):
         .join(c.reviews.listing(token).groupby("prism_id").size().rename("Episodios"))
         .fillna({"Episodios": 0, "Tasa": 0})
         .reset_index()
-        .rename(columns={"prism_id": "Prisma", "Ultima": "Última medición", "Tasa": "Tasa máx. (mm/día)"})
+        .rename(
+            columns={
+                "prism_id": "Prisma",
+                "Ultima": "Última medición",
+                "Tasa": "Tasa máx. (mm/día)",
+            }
+        )
     )
     if search:
         directory = directory.loc[directory["Prisma"].astype(str).str.contains(search, regex=False)]
@@ -722,6 +771,54 @@ def quality_view(c, token):
             ("No evaluables", f"{len(bad):,}", "warn" if len(bad) else "ok"),
         ]
     )
+
+    st.subheader("Importación de mediciones externas")
+    st.caption(
+        "Carga un archivo CSV para validar de forma segura su estructura y visualizar "
+        "sus mediciones. Los datos históricos no serán modificados."
+    )
+
+    with st.expander("Ver formato CSV requerido"):
+        st.code(
+            "source_record_id,prism_id,timestamp,easting,northing,"
+            "rl,movement_rate_mm_per_day,elapsed_hours\n"
+            "R001,P001,2026-11-09T10:00:00Z,"
+            "500000,8500000,1200,2.5,24",
+            language="csv",
+        )
+
+    uploaded_csv = st.file_uploader(
+        "Seleccionar archivo de mediciones CSV",
+        type=["csv"],
+        key="hu106_csv_upload",
+        max_upload_size=10,
+    )
+
+    if uploaded_csv is not None:
+        content = uploaded_csv.getvalue()
+
+        if len(content) > MAX_FILE_SIZE:
+            st.error("El archivo supera el límite de 10 MB.")
+        else:
+            try:
+                validated_data = validate_csv(
+                    content,
+                    filename=getattr(uploaded_csv, "name", None),
+                    content_type=getattr(uploaded_csv, "type", None),
+                )
+            except ValidationError as exc:
+                st.error(f"Archivo rechazado: {exc}")
+            else:
+                st.success("Archivo CSV validado correctamente.")
+                st.metric("Registros importados para vista previa", len(validated_data))
+                st.metric("Prismas identificados", validated_data["prism_id"].nunique())
+                st.dataframe(validated_data.head(100), hide_index=True)
+                st.info(
+                    "Vista previa únicamente. Los registros no se han guardado "
+                    "ni incorporado al análisis histórico."
+                )
+
+    st.divider()
     st.metric("Registros no evaluables", len(bad))
     st.info(
         "Ausencia de datos no significa estabilidad. La calidad se conserva separada de las marcas estadísticas."
@@ -735,12 +832,16 @@ def quality_view(c, token):
     with st.container(key="gx_card_bad_prism"):
         _section("No evaluables por prisma")
         counts = bad.groupby("prism_id").size().rename("Registros").reset_index()
-        fig = px.bar(counts, x="prism_id", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]])
+        fig = px.bar(
+            counts, x="prism_id", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]]
+        )
         st.plotly_chart(theme.style_fig(fig), width="stretch")
     with st.container(key="gx_card_bad_date"):
         _section("No evaluables por fecha")
         counts = bad.groupby(bad.timestamp.dt.date).size().rename("Registros").reset_index()
-        fig = px.bar(counts, x="timestamp", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]])
+        fig = px.bar(
+            counts, x="timestamp", y="Registros", color_discrete_sequence=[theme.PALETTE["gray"]]
+        )
         st.plotly_chart(theme.style_fig(fig), width="stretch")
     st.dataframe(
         bad[
@@ -785,9 +886,7 @@ def _render_synthetic_panel(c, token):
             days = col2.number_input(
                 "Horizonte (días)", min_value=3, max_value=90, value=15, step=1, key="syn_days"
             )
-            cadence = col3.selectbox(
-                "Cadencia (horas)", [6, 12, 24], index=1, key="syn_cadence"
-            )
+            cadence = col3.selectbox("Cadencia (horas)", [6, 12, 24], index=1, key="syn_cadence")
             col4, col5, col6 = st.columns(3)
             deformed = col4.slider(
                 "Fracción con deformación", 0.0, 1.0, 0.25, 0.05, key="syn_deformed"
@@ -888,7 +987,10 @@ def report_view(c, token):
         if prepared and prepared[0] == signature:
             mime = {"PDF": "application/pdf", "CSV": "text/csv", "JSON": "application/json"}[fmt]
             st.download_button(
-                "Descargar reporte", prepared[1], file_name=f"GeoSlope_{scope}.{fmt.lower()}", mime=mime
+                "Descargar reporte",
+                prepared[1],
+                file_name=f"GeoSlope_{scope}.{fmt.lower()}",
+                mime=mime,
             )
     st.info(NOTICE)
 
@@ -907,7 +1009,11 @@ def users_view(c, token):
         [
             ("Cuentas", len(accounts), "info"),
             ("Activas", sum(1 for u in accounts if u.get("active")), "ok"),
-            ("Administradores", sum(1 for u in accounts if u.get("role") == "administrador"), "mute"),
+            (
+                "Administradores",
+                sum(1 for u in accounts if u.get("role") == "administrador"),
+                "mute",
+            ),
         ]
     )
     st.dataframe(pd.DataFrame(accounts), hide_index=True)
