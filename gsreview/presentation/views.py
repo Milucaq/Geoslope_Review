@@ -17,7 +17,7 @@ from gsreview.domain.rules import (
     ValidationError,
 )
 from gsreview.presentation import theme
-from gsreview.presentation.charts import series
+from gsreview.presentation.charts import series, synthetic_spatial_map
 
 NAV = (
     "Inicio",
@@ -872,12 +872,13 @@ def quality_view(c, token):
 
 
 def _render_synthetic_panel(c, token):
-    st.subheader("Simulación sintética de monitoreo (HU-103)")
+    st.subheader("Simulación sintética y detección espacial de fallas (HU-103 / HU-117)")
     st.caption(
-        "Genera series temporales sintéticas de prismas para pruebas de monitoreo "
-        "y validación funcional sin alterar los artefactos congelados."
+        "Genera escenarios sintéticos de taludes, visualiza en 2D/3D la distribución espacial "
+        "de prismas y ejecuta el clasificador híbrido de fallas potenciales sin alterar los artefactos congelados."
     )
-    with st.expander("Configurar y generar escenario sintético", expanded=False):
+    has_scenario = "synthetic_scenario" in st.session_state
+    with st.expander("Configurar y generar escenario sintético", expanded=has_scenario):
         with st.form("synthetic_generator_form"):
             col1, col2, col3 = st.columns(3)
             n_prisms = col1.number_input(
@@ -920,21 +921,155 @@ def _render_synthetic_panel(c, token):
         scenario = st.session_state.get("synthetic_scenario")
         if scenario:
             summary = scenario["summary"]
+            syn_rows = scenario["records"]
+            spatial_points = scenario.get("spatial_points")
+            if spatial_points is None:
+                from gsreview.analytics.synthetic import classify_synthetic_prisms
+
+                spatial_points = classify_synthetic_prisms(syn_rows)
+
+            n_alert = int(summary.get("prismas_alerta_falla", 0))
+            n_watch = int(summary.get("prismas_observacion", 0))
+            n_stable = int(summary.get("prismas_estables", 0))
+            stab_pct = float(summary.get("indice_estabilidad_pct", 100.0))
+
+            _stats(
+                [
+                    ("Prismas estables", n_stable, "ok"),
+                    ("En observación", n_watch, "warn" if n_watch else "ok"),
+                    ("Alerta de falla (IA)", n_alert, "danger" if n_alert else "ok"),
+                    (
+                        "Estabilidad global",
+                        f"{stab_pct:.1f}%",
+                        "ok" if stab_pct >= 75.0 else "warn",
+                    ),
+                ]
+            )
+
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Prismas sintéticos", summary["prismas"])
             m2.metric("Registros generados", summary["registros"])
             m3.metric("Candidatos híbridos", summary["candidatos_hibridos"])
             m4.metric("Episodios simulados", summary["episodios"])
-            syn_rows = scenario["records"]
+
+            st.markdown("#### Visor espacial del talud y detección de fallas potenciales")
+            ctrl1, ctrl2, ctrl3 = st.columns([1.2, 2.0, 2.0])
+            syn_dim = (
+                ctrl1.segmented_control(
+                    "Vista del mapa",
+                    ["3D", "2D"],
+                    default="3D",
+                    key="syn_spatial_dim",
+                )
+                or "3D"
+            )
+            risk_filter = ctrl2.selectbox(
+                "Filtrar por nivel de riesgo",
+                [
+                    "Todos",
+                    "Alerta de falla potencial",
+                    "Variación en observación",
+                    "Normal / Estable",
+                ],
+                key="syn_risk_filter",
+            )
+            filtered_points = (
+                spatial_points
+                if risk_filter == "Todos"
+                else spatial_points.loc[spatial_points["risk_label"].eq(risk_filter)]
+            )
+            if filtered_points.empty:
+                st.info("No hay prismas en el nivel de riesgo seleccionado; mostrando todos.")
+                filtered_points = spatial_points
+
+            ordered_prisms = filtered_points.sort_values("risk_score", ascending=False)[
+                "prism_id"
+            ].tolist()
+            selected_prism = ctrl3.selectbox(
+                "Inspeccionar prisma (Diagnóstico IA)",
+                ordered_prisms,
+                key="syn_selected_prism",
+            )
+
+            map_col, diag_col = st.columns([1.65, 1.0])
+            with map_col:
+                st.plotly_chart(
+                    synthetic_spatial_map(
+                        filtered_points, dimension=syn_dim, selected=selected_prism
+                    ),
+                    width="stretch",
+                )
+            with diag_col:
+                p_row = spatial_points.loc[spatial_points["prism_id"].eq(selected_prism)].iloc[0]
+                tone_map = {
+                    "alerta_falla": "danger",
+                    "observacion": "warn",
+                    "estable": "ok",
+                }
+                badge_html = theme.badge(
+                    p_row["risk_label"], tone_map.get(p_row["risk_level"], "info")
+                )
+                theme.html(
+                    '<div class="gx-card">'
+                    '<div class="gx-section"><h3>Diagnóstico predictivo del prisma</h3>'
+                    f"<span>{escape(str(p_row['prism_id']))}</span></div>"
+                    f"<p>{badge_html} &nbsp; <b>Índice de riesgo IA:</b> {p_row['risk_score']:.1f} / 100</p>"
+                    f"<p><b>Ubicación:</b> {escape(str(p_row['sector']))} · {escape(str(p_row['bench']))}</p>"
+                    f"<p><b>Coordenadas:</b> E {p_row['easting']:.2f} m · N {p_row['northing']:.2f} m · RL {p_row['rl']:.2f} m</p>"
+                    f"<p><b>Desplazamiento 3D:</b> {p_row['displacement_mm']:.2f} mm</p>"
+                    f"<p><b>Tasa actual / máx.:</b> {p_row['latest_rate_mm_day']:.2f} / {p_row['max_rate_mm_day']:.2f} mm/día</p>"
+                    f"<p><b>Aceleración:</b> {p_row['acceleration_mm_day2']:+.3f} mm/día²</p>"
+                    f"<p><b>Scores máx. (Base / IF):</b> {p_row['max_baseline_score']:.2f} / {p_row['max_iforest_score']:.2f}</p>"
+                    f"<p><b>Dictamen IA:</b> {escape(str(p_row['diagnosis']))}</p>"
+                    "</div>"
+                )
+
             st.plotly_chart(
-                px.line(
-                    syn_rows.dropna(subset=["reported_3d_movement_mm"]),
-                    x="timestamp",
-                    y="reported_3d_movement_mm",
-                    color="prism_id",
-                    title="Desplazamiento 3D sintético acumulado (mm)",
+                theme.style_fig(
+                    px.line(
+                        syn_rows.dropna(subset=["reported_3d_movement_mm"]),
+                        x="timestamp",
+                        y="reported_3d_movement_mm",
+                        color="prism_id",
+                        title="Desplazamiento 3D sintético acumulado (mm)",
+                    )
                 ),
                 width="stretch",
+            )
+
+            st.markdown("##### Resumen de detección por prisma")
+            st.dataframe(
+                spatial_points[
+                    [
+                        "prism_id",
+                        "sector",
+                        "bench",
+                        "risk_label",
+                        "risk_score",
+                        "displacement_mm",
+                        "latest_rate_mm_day",
+                        "max_rate_mm_day",
+                        "acceleration_mm_day2",
+                        "diagnosis",
+                    ]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+            csv_bytes = scenario.get("csv_bytes")
+            if csv_bytes is None:
+                csv_bytes = c.synthetic.export_csv(
+                    token, scenario, seed=int(summary.get("semilla", 42))
+                )
+                scenario["csv_bytes"] = csv_bytes
+
+            st.download_button(
+                "Descargar mediciones sintéticas (CSV)",
+                data=csv_bytes,
+                file_name=f"geoslope_sintetico_seed_{summary.get('semilla', 42)}.csv",
+                mime="text/csv",
+                key="syn_download_csv",
             )
             st.dataframe(
                 syn_rows[

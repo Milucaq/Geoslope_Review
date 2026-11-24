@@ -117,11 +117,7 @@ def spatial(points, dimension="3D", colors=None, selected=None, focus=False, lab
 
     fig = go.Figure()
 
-    mark_count = int(
-        points.causal_state.isin(
-            ["marca_aislada", "episodio_en_observacion"]
-        ).sum()
-    )
+    mark_count = int(points.causal_state.isin(["marca_aislada", "episodio_en_observacion"]).sum())
 
     for state, group in points.groupby("causal_state"):
         custom = (
@@ -283,5 +279,181 @@ def movement_preview(rows):
         margin={"l": 20, "r": 5, "t": 45, "b": 55},
         legend={"orientation": "h", "font": {"size": 9}},
         font={"size": 10, "color": COLORS["spatial_text"]},
+    )
+    return fig
+
+
+SYNTHETIC_RISK_COLORS = {
+    "estable": "#10B981",
+    "observacion": "#F59E0B",
+    "alerta_falla": "#EF4444",
+}
+
+SYNTHETIC_RISK_SYMBOLS = {
+    "estable": "circle",
+    "observacion": "diamond-open",
+    "alerta_falla": "diamond",
+}
+
+SYNTHETIC_RISK_ORDER = ("alerta_falla", "observacion", "estable")
+
+
+def synthetic_spatial_map(points, dimension="3D", selected=None):
+    """Renderiza el mapa espacial 2D/3D de prismas sintéticos coloreados por riesgo de falla (HU-117)."""
+    fig = go.Figure()
+
+    if dimension == "3D" and not points.empty and len(points) >= 3:
+        e_min, e_max = float(points["easting"].min()) - 8.0, float(points["easting"].max()) + 8.0
+        n_min, n_max = float(points["northing"].min()) - 8.0, float(points["northing"].max()) + 8.0
+        rl_max, rl_min = float(points["rl"].max()) + 2.0, float(points["rl"].min()) - 2.0
+        fig.add_trace(
+            go.Surface(
+                x=[[e_min, e_max], [e_min, e_max]],
+                y=[[n_min, n_min], [n_max, n_max]],
+                z=[[rl_max, rl_min], [rl_max, rl_min]],
+                colorscale=[[0, "#102837"], [0.5, "#17384C"], [1, "#1F4961"]],
+                opacity=0.32,
+                showscale=False,
+                name="Superficie del talud simulado",
+                hoverinfo="skip",
+            )
+        )
+
+    for level in SYNTHETIC_RISK_ORDER:
+        group = points.loc[points["risk_level"].eq(level)]
+        if group.empty:
+            continue
+        label = group["risk_label"].iloc[0]
+        color = SYNTHETIC_RISK_COLORS.get(level, COLORS["spatial_series"])
+        symbol = SYNTHETIC_RISK_SYMBOLS.get(level, "circle")
+        custom = (
+            group[
+                [
+                    "prism_id",
+                    "sector",
+                    "bench",
+                    "displacement_mm",
+                    "latest_rate_mm_day",
+                    "risk_label",
+                    "risk_score",
+                    "diagnosis",
+                ]
+            ]
+            .astype(str)
+            .to_numpy()
+        )
+        common = {
+            "mode": "markers+text",
+            "text": group["prism_id"],
+            "textposition": "top center",
+            "textfont": {"size": 11, "color": COLORS["spatial_text"]},
+            "customdata": custom,
+            "name": f"{label} ({len(group)})",
+            "marker": {
+                "size": 8 if dimension == "3D" else 13,
+                "color": color,
+                "symbol": symbol,
+                "opacity": 0.95,
+                "line": {"width": 1.5, "color": "#FFFFFF"},
+            },
+            "hovertemplate": (
+                "<b>Prisma %{customdata[0]}</b> · %{customdata[1]} (%{customdata[2]})<br>"
+                "Estado IA: <b>%{customdata[5]}</b> (Índice %{customdata[6]}/100)<br>"
+                "Desplazamiento 3D: %{customdata[3]} mm · Tasa: %{customdata[4]} mm/día<br>"
+                "Diagnóstico: %{customdata[7]}<extra></extra>"
+            ),
+        }
+        if dimension == "3D":
+            fig.add_trace(
+                go.Scatter3d(
+                    x=group["easting"],
+                    y=group["northing"],
+                    z=group["rl"],
+                    **common,
+                )
+            )
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=group["easting"],
+                    y=group["northing"],
+                    **common,
+                )
+            )
+
+    if selected is not None and not points.empty:
+        target = points.loc[points["prism_id"].eq(selected)]
+        if not target.empty:
+            row = target.iloc[0]
+            highlight = {
+                "mode": "markers",
+                "name": f"Seleccionado ({selected})",
+                "showlegend": False,
+                "marker": {
+                    "size": 15 if dimension == "3D" else 22,
+                    "color": COLORS["spatial_selected"],
+                    "symbol": "circle-open",
+                    "line": {"width": 3, "color": COLORS["spatial_selected"]},
+                },
+                "hoverinfo": "skip",
+            }
+            if dimension == "3D":
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[row["easting"]],
+                        y=[row["northing"]],
+                        z=[row["rl"]],
+                        **highlight,
+                    )
+                )
+            else:
+                fig.add_trace(
+                    go.Scatter(
+                        x=[row["easting"]],
+                        y=[row["northing"]],
+                        **highlight,
+                    )
+                )
+
+    fig.update_layout(
+        title=f"Mapa espacial del talud simulado ({dimension}) · Detección de fallas por IA",
+        height=520,
+        template="plotly_white",
+        paper_bgcolor=COLORS["spatial_panel"],
+        plot_bgcolor=COLORS["spatial_panel"],
+        font={"color": COLORS["spatial_text"]},
+        legend={"orientation": "h", "y": -0.12, "font": {"size": 11}},
+        margin={"l": 12, "r": 12, "t": 55, "b": 75},
+        scene={
+            "bgcolor": COLORS["spatial_panel"],
+            "aspectmode": "data",
+            "xaxis": {
+                "title": "Este (Easting, m)",
+                "nticks": 5,
+                "backgroundcolor": COLORS["spatial_panel"],
+                "gridcolor": COLORS["spatial_grid"],
+            },
+            "yaxis": {
+                "title": "Norte (Northing, m)",
+                "nticks": 5,
+                "backgroundcolor": COLORS["spatial_panel"],
+                "gridcolor": COLORS["spatial_grid"],
+            },
+            "zaxis": {
+                "title": "Cota (RL, m)",
+                "nticks": 5,
+                "backgroundcolor": COLORS["spatial_panel"],
+                "gridcolor": COLORS["spatial_grid"],
+            },
+        },
+    )
+    fig.update_xaxes(
+        title="Este (Easting, m)",
+        scaleanchor="y",
+        gridcolor=COLORS["spatial_grid"],
+    )
+    fig.update_yaxes(
+        title="Norte (Northing, m)",
+        gridcolor=COLORS["spatial_grid"],
     )
     return fig

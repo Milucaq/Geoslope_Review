@@ -247,4 +247,159 @@ def generate_synthetic_monitoring_data(config: SyntheticConfig | None = None) ->
         "episodios": len(episodes_df),
         "semilla": cfg.seed,
     }
-    return {"records": records_df, "episodes": episodes_df, "summary": summary, "config": cfg}
+    spatial_points = classify_synthetic_prisms(records_df)
+    total_p = max(1, len(spatial_points))
+    n_stable = int((spatial_points["risk_level"] == "estable").sum())
+    n_watch = int((spatial_points["risk_level"] == "observacion").sum())
+    n_alert = int((spatial_points["risk_level"] == "alerta_falla").sum())
+    summary.update(
+        {
+            "prismas_estables": n_stable,
+            "prismas_observacion": n_watch,
+            "prismas_alerta_falla": n_alert,
+            "indice_estabilidad_pct": round((n_stable / total_p) * 100.0, 1),
+        }
+    )
+    return {
+        "records": records_df,
+        "episodes": episodes_df,
+        "spatial_points": spatial_points,
+        "summary": summary,
+        "config": cfg,
+    }
+
+
+RISK_LABELS = {
+    "estable": "Normal / Estable",
+    "observacion": "Variación en observación",
+    "alerta_falla": "Alerta de falla potencial",
+}
+
+CSV_EXPORT_COLUMNS = (
+    "source_record_id",
+    "prism_id",
+    "timestamp",
+    "easting",
+    "northing",
+    "rl",
+    "reported_3d_movement_mm",
+    "movement_rate_mm_per_day",
+    "elapsed_hours",
+)
+
+
+def classify_synthetic_prisms(records_df: pd.DataFrame) -> pd.DataFrame:
+    """Evalúa cada prisma sintético y clasifica su nivel de riesgo de falla (HU-117)."""
+    if records_df is None or records_df.empty:
+        raise ValidationError("No existen registros sintéticos para evaluar espacialmente.")
+
+    rows = []
+    for prism_id, group in records_df.groupby("prism_id", sort=False):
+        ordered = group.sort_values("timestamp")
+        evaluable = ordered.loc[ordered["model_eligible"].fillna(False)].copy()
+        latest = evaluable.iloc[-1] if not evaluable.empty else ordered.iloc[-1]
+
+        rates = pd.to_numeric(evaluable["movement_rate_mm_per_day"], errors="coerce").dropna()
+        disps = pd.to_numeric(evaluable["reported_3d_movement_mm"], errors="coerce").dropna()
+        b_scores = pd.to_numeric(evaluable["baseline_score"], errors="coerce").dropna()
+        if_scores = pd.to_numeric(evaluable["isolation_forest_score"], errors="coerce").dropna()
+
+        disp_mm = float(disps.iloc[-1]) if not disps.empty else 0.0
+        latest_rate = float(rates.iloc[-1]) if not rates.empty else 0.0
+        max_rate = float(rates.max()) if not rates.empty else 0.0
+        mean_rate = float(rates.mean()) if not rates.empty else 0.0
+
+        if len(rates) >= 4:
+            half = len(rates) // 2
+            accel = float(rates.iloc[half:].mean() - rates.iloc[:half].mean())
+        elif len(rates) >= 2:
+            accel = float(rates.iloc[-1] - rates.iloc[0])
+        else:
+            accel = 0.0
+
+        max_b = float(b_scores.max()) if not b_scores.empty else 0.0
+        max_if = float(if_scores.max()) if not if_scores.empty else 0.0
+        mark_count = int(evaluable["union_mark"].fillna(False).sum())
+        cand_count = int(evaluable["candidate_hybrid"].fillna(False).sum())
+
+        b_ratio = min(1.5, max_b / BASELINE_Q99) if BASELINE_Q99 > 0 else 0.0
+        if_ratio = min(1.5, max_if / IFOREST_Q99) if IFOREST_Q99 > 0 else 0.0
+        accel_factor = min(1.0, max(0.0, accel) / 3.0)
+        raw_score = (0.35 * b_ratio + 0.35 * if_ratio + 0.30 * accel_factor) * 75.0
+        if cand_count >= 1:
+            raw_score = max(78.0, raw_score + min(22.0, cand_count * 3.5))
+        elif mark_count >= 1:
+            raw_score = max(45.0, raw_score + 10.0)
+        risk_score = round(min(100.0, max(2.0, raw_score)), 1)
+
+        if cand_count >= 1 or (max_b >= BASELINE_Q99 and max_if >= IFOREST_Q99):
+            risk_level = "alerta_falla"
+            diagnosis = (
+                "Aceleración progresiva detectada por consenso Baseline + Isolation Forest. "
+                "Posible inestabilidad de banco; requiere inspección geotécnica prioritaria."
+            )
+        elif mark_count >= 1 or max_b >= BASELINE_Q99 or max_if >= IFOREST_Q99 or max_rate >= 1.5:
+            risk_level = "observacion"
+            diagnosis = (
+                "Anomalía transitoria o incremento moderado de velocidad. "
+                "Mantener seguimiento instrumental en próximas lecturas."
+            )
+        else:
+            risk_level = "estable"
+            diagnosis = (
+                "Comportamiento dentro de la banda base de ruido instrumental. "
+                "Sin indicios de falla activa."
+            )
+
+        rows.append(
+            {
+                "prism_id": str(prism_id),
+                "sector": str(latest["sector"]),
+                "bench": str(latest["bench"]),
+                "timestamp": latest["timestamp"],
+                "easting": round(float(latest["easting"]), 4),
+                "northing": round(float(latest["northing"]), 4),
+                "rl": round(float(latest["rl"]), 4),
+                "displacement_mm": round(disp_mm, 2),
+                "latest_rate_mm_day": round(latest_rate, 2),
+                "max_rate_mm_day": round(max_rate, 2),
+                "mean_rate_mm_day": round(mean_rate, 2),
+                "acceleration_mm_day2": round(accel, 3),
+                "max_baseline_score": round(max_b, 4),
+                "max_iforest_score": round(max_if, 4),
+                "mark_count": mark_count,
+                "candidate_count": cand_count,
+                "risk_level": risk_level,
+                "risk_label": RISK_LABELS[risk_level],
+                "risk_score": risk_score,
+                "diagnosis": diagnosis,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def export_synthetic_records_to_csv(records_df: pd.DataFrame) -> bytes:
+    """Exporta mediciones sintéticas evaluables en formato CSV compatible con validate_csv."""
+    if records_df is None or records_df.empty:
+        raise ValidationError("No existen mediciones sintéticas para exportar.")
+
+    missing = [col for col in CSV_EXPORT_COLUMNS if col not in records_df.columns]
+    if missing:
+        raise ValidationError("Faltan columnas requeridas para exportar: " + ", ".join(missing))
+
+    export_df = records_df.copy()
+    if "model_eligible" in export_df.columns:
+        export_df = export_df.loc[export_df["model_eligible"].fillna(False)].copy()
+
+    export_df = export_df.dropna(
+        subset=["easting", "northing", "rl", "reported_3d_movement_mm", "movement_rate_mm_per_day"]
+    ).copy()
+
+    if export_df.empty:
+        raise ValidationError("No hay registros evaluables válidos para exportar a CSV.")
+
+    ts = pd.to_datetime(export_df["timestamp"], errors="coerce", utc=True)
+    export_df["timestamp"] = ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    export_df = export_df.loc[:, CSV_EXPORT_COLUMNS]
+    return export_df.to_csv(index=False, lineterminator="\n").encode("utf-8")
