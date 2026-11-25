@@ -137,6 +137,12 @@ def login(c):
             if enroll
             else "Introduce el código de tu autenticador para terminar de ingresar."
         )
+        (
+            "Paso 3 de 3 · Segundo factor"
+            if st.session_state.get("setup_flow")
+            else "Paso 2 de 2 · " + ("Segundo factor" if enroll else "Verificación en dos pasos")
+        )
+
     elif needs_setup:
         title = "Crea el administrador" if key_ok else "Activa tu instalación"
         subtitle = (
@@ -149,6 +155,8 @@ def login(c):
             "Bienvenido",
             "Ingresa con tu usuario y contraseña para acceder a la plataforma.",
         )
+
+        
 
     with st.container(key="gs_login_root"):
         st.markdown(login_css(), unsafe_allow_html=True)
@@ -166,7 +174,8 @@ def login(c):
                 )
                 if not (preview or key_is_valid(entered_key)):
                     if entered_key:
-                        st.error("La clave de instalación no es correcta.")
+                        st.error("Clave incorrecta. Verifica que sea la clave entregada con la instalación "
+                                 "(distingue mayúsculas y minúsculas) o pídela a quien instaló el sistema.")
                     return
 
                 with st.form("bootstrap"):

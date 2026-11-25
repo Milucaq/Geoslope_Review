@@ -134,12 +134,12 @@ def header_html(brand: str, title: str, subtitle: str) -> str:
         f'<rect width="32" height="32" rx="9" fill="url(#gsMark)"/>'
         f'<path d="M6 11h20M9 16h14M12 21h8" stroke="{BG}" stroke-width="2.4" stroke-linecap="round"/></svg>'
     )
+  
     return _flat(
         f"""<div class="gs-head">
 <div class="gs-brand">{mark}<span>{brand}</span></div>
 <h1>{title}</h1>
 <p>{subtitle}</p>
-<span class="gs-pill"><b></b>Sistema local offline</span>
 </div>"""
     )
 
@@ -219,9 +219,8 @@ background:linear-gradient(135deg,rgba(185,228,232,.5),rgba(22,125,141,0) 40%,rg
 .gs-brand{display:flex;align-items:center;gap:.7rem;font-weight:600;font-size:1rem;color:var(--gs-neutral);margin-bottom:1.6rem}
 .gs-head h1{margin:0;padding:0;font-size:2.2rem;line-height:1.1;letter-spacing:-.03em;font-weight:750;color:var(--gs-neutral)}
 .gs-head p{margin:.7rem 0 1rem;font-size:.97rem;line-height:1.5;color:rgba(238,238,238,.76)}
-.gs-pill{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .75rem;border-radius:999px;font-size:.8rem;color:var(--gs-secondary);
-background:rgba(22,125,141,.18);border:1px solid rgba(185,228,232,.22)}
-.gs-pill b{width:7px;height:7px;border-radius:50%;background:var(--gs-secondary);box-shadow:0 0 0 0 rgba(185,228,232,.6);animation:gs-ping 2.6s ease-out infinite}
+.gs-head p{margin:.7rem 0.25rem;font-size:.97rem;line-height:1.5;color:rgba(238,238,238,.76)}
+.gs-step{display:block;margin:0 0 .5rem;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--gs-secondary)}
 
 /* ---------- campos ---------- */
 .st-key-gs_login_root [data-testid="stWidgetLabel"] p,.st-key-gs_login_root label p{color:var(--gs-neutral)!important;font-size:.88rem;font-weight:550}
@@ -272,7 +271,6 @@ border-radius:14px!important;background:transparent!important;color:var(--gs-sec
 @keyframes gs-drift{from{transform:translateX(-50px)}to{transform:translateX(50px)}}
 @keyframes gs-dash{to{stroke-dashoffset:-240}}
 @keyframes gs-blink{0%,100%{opacity:.35}50%{opacity:1}}
-@keyframes gs-ping{0%{box-shadow:0 0 0 0 rgba(185,228,232,.55)}80%,100%{box-shadow:0 0 0 9px rgba(185,228,232,0)}}
 
 /* ---------- responsive ---------- */
 @media (max-width:900px){
