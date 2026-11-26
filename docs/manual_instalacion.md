@@ -2,7 +2,7 @@
 
 ## Requisitos
 
-Python 3.11 o posterior, laptop con navegador moderno, espacio para datos y backups. Las fases iniciales se validaron en Linux/Python 3.12; la integración científica y funcional actual se prueba en Windows/Python 3.13.14. Python 3.11 y el worker Chronos en Linux no se han revalidado en esta fase. Se recomiendan 8 GB de RAM. El checkout incluye los 17 artefactos en `ci_artifacts` y los activos topográficos optimizados; el arranque no requiere carpetas superiores ni archivos privados. Conserva por separado los datos y la clave de una instalación existente.
+Python 3.11 o posterior, laptop con navegador moderno, espacio para datos y backups. El candidato 0.8.0 se validó en Windows/Python 3.13.14 y en Ubuntu 26.04/Python 3.13.18 mediante GitHub Actions; consulta la [evidencia del release](releases/0.8.0.md#validación-del-candidato). Python 3.11 y el worker Chronos en Linux no se han revalidado en esta fase. Se recomiendan 8 GB de RAM. El checkout incluye los 17 artefactos en `ci_artifacts` y los activos topográficos optimizados; el arranque no requiere carpetas superiores ni archivos privados. Conserva por separado los datos y la clave de una instalación existente.
 
 Chronos utiliza un entorno CPU opcional independiente, con versiones y checkpoint fijados: consulta [instalación científica](scientific_integration.md). No agregues sus pesos ni `.venv` a Git ni a la instancia gratuita de Render. Tras actualizar código reinicia Streamlit para renovar su contenedor cacheado y conserva el puerto/configuración existentes. La [demostración integral](demostracion_integral.md) usa la autenticación ya configurada.
 
