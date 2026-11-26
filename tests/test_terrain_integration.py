@@ -1,6 +1,6 @@
 import hashlib
 import json
-from shutil import copytree
+from shutil import copyfile
 
 import numpy as np
 import pytest
@@ -38,7 +38,10 @@ def test_surface_preserves_values_and_has_its_own_reference(app):
 
 def test_corrupted_or_invalid_surface_is_rejected(app, tmp_path):
     root = tmp_path / "assets/terrain"
-    copytree(app.app_root / "assets/terrain", root)
+    root.mkdir(parents=True)
+    # This test validates Century only; never copy the optional John Henry mosaic.
+    for name in ("metadata.json", "century_surface.npz"):
+        copyfile(app.app_root / "assets/terrain" / name, root / name)
     path = root / "century_surface.npz"
     path.write_bytes(path.read_bytes()[:-5] + b"wrong")
     with pytest.raises(ValidationError, match="versión verificada"):
@@ -51,6 +54,26 @@ def test_corrupted_or_invalid_surface_is_rejected(app, tmp_path):
     (root / "metadata.json").write_text(json.dumps(meta))
     with pytest.raises(ValidationError, match="datos inválidos"):
         load_surface(tmp_path)
+
+
+def terrain_without_raster_app(root):
+    from pathlib import Path
+    from types import SimpleNamespace
+    from gsreview.presentation.terrain import render_terrain
+    render_terrain(SimpleNamespace(app_root=Path(root)), "3D")
+
+
+def test_optimized_surface_remains_available_without_original_geotiff(app, tmp_path):
+    terrain = tmp_path / "assets/terrain"
+    terrain.mkdir(parents=True)
+    for name in ("metadata.json", "century_surface.npz"):
+        copyfile(app.app_root / "assets/terrain" / name, terrain / name)
+    at = AppTest.from_function(
+        terrain_without_raster_app, args=(str(tmp_path),), default_timeout=25
+    ).run()
+    assert not at.exception and not at.error
+    assert any("GeoTIFF original no se distribuye" in caption.value for caption in at.caption)
+    assert not at.get("download_button")
 
 
 @pytest.mark.parametrize("role", ["administrador", "ingeniero"])

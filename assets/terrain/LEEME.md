@@ -1,6 +1,6 @@
 # Relieve integrado de Century Mine
 
-Modelo de superficie Copernicus GLO-30, resolución aproximada de 30 m. Incluye la malla compacta `century_surface.npz`, el GeoTIFF original recortado, metadatos, XML de origen, huellas de adquisición y licencia. La malla compacta conserva las coordenadas publicadas en el CSV de la entrega de relieve, redondeadas a ocho decimales. No se interpola ni se altera la cota.
+Modelo de superficie Copernicus GLO-30, resolución aproximada de 30 m. El release incluye la malla compacta `century_surface.npz`, metadatos, XML de origen, huellas de adquisición y licencia. El GeoTIFF original recortado queda fuera del índice de publicación; su copia local se conserva y puede descargarse desde la app cuando está presente. El visor también funciona sin ese raster. La malla compacta conserva las coordenadas publicadas en el CSV de la entrega de relieve, redondeadas a ocho decimales. No se interpola ni se altera la cota.
 
 Usa Mostrar relieve de Century Mine en Vista espacial. El plano 2D conserva longitud/latitud WGS84; la vista 3D usa UTM 54S (EPSG:32754). Cotas en metros EGM2008 (EPSG:3855). La exageración 1×/3×/5× cambia únicamente la proporción visual.
 

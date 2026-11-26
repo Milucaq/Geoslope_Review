@@ -11,6 +11,7 @@ from gsreview.domain.rules import AccessDenied, ValidationError
 from gsreview.presentation.views import login, VIEWS
 from gsreview.presentation.navigation import render_navigation
 from gsreview.configuration import BRAND
+from gsreview.presentation.scenarios import render_scenario_selector, render_scenario_page
 
 
 @st.cache_resource
@@ -53,7 +54,21 @@ def main():
                 st.session_state.pop("recovery_once", None)
                 st.rerun()
             return
+        from gsreview.application.scenarios import bind_session
+        bind_session(st.session_state, token)
+        scenario_slot = st.sidebar.container()
         page = render_navigation(c, token, actor)
+        # Keep forced password-change/profile flows under their existing permissions.
+        if page in {"Inicio", "Vista espacial", "Calidad de datos", "Prismas",
+                    "Bandeja de revisión", "Reportes"}:
+            c.auth.authorize(token, "read")
+            active = render_scenario_selector(token, scenario_slot)
+            from gsreview.presentation.persistence import scenario_controls
+            scenario_controls(c, token, active)
+            from gsreview.presentation.workflow import render_workflow
+            render_workflow(c, token, active, page)
+            if render_scenario_page(active, page, c, token):
+                return
         if page != "Vista espacial":
             st.session_state.pop("spatial_access_logged", None)
         VIEWS[page](c, token)

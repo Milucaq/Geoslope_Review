@@ -3,7 +3,7 @@
     name: geoslope-review
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt && pip install -e .
+    buildCommand: pip install -r requirements.txt && pip install -e . && python scripts/verify_release_assets.py && python scripts/verify_integrity.py
     startCommand: python render_start.py
     envVars:
       - key: PYTHON_VERSION

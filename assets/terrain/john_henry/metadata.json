@@ -1,0 +1,75 @@
+{
+  "site": "John Henry Mine",
+  "dataset": "OpenTopography OT.112024.6339.2",
+  "source_page": "https://portal.opentopography.org/datasetMetadata?otCollectionID=OT.112024.6339.2",
+  "doi": "10.5069/G93F4MVH",
+  "license": "CC BY 4.0",
+  "attribution": "Office of Surface Mining Reclamation and Enforcement (2024); collected by Surdex; distributed by OpenTopography",
+  "survey_date": "2023-10-06",
+  "horizontal_crs": "EPSG:6339",
+  "vertical_datum": "NAVD88 (EPSG:5703)",
+  "units": "m",
+  "tiles": [
+    "A_01",
+    "A_02",
+    "A_03",
+    "B_01",
+    "B_02",
+    "B_03"
+  ],
+  "source_dem_resolution_m": [
+    0.3,
+    0.3
+  ],
+  "source_ortho_resolution_m": [
+    0.1,
+    0.1
+  ],
+  "mesh_spacing_m": [
+    3.6,
+    3.6
+  ],
+  "grid_valid_cells": 205273,
+  "grid_total_cells": 463704,
+  "vertices": 205273,
+  "triangles": 408050,
+  "bounds": [
+    575136.1,
+    5240512.8,
+    577224.1,
+    5242370.399999999
+  ],
+  "origin": [
+    576180.1,
+    5241441.6,
+    233.45449829101562
+  ],
+  "elevation_range": [
+    183.27200317382812,
+    283.6369934082031
+  ],
+  "texture_size": [
+    4096,
+    3644
+  ],
+  "texture_missing_fraction": 0.0,
+  "processing": "Common projected grid, nearest DEM resampling, conservative valid-cell mask, no bridging NoData, first valid tile wins in overlap; RGB nearest resampling; no invented elevations.",
+  "source_hashes": {
+    "dem_A_01.tif": "4cdfbd6909073780fdabf395f7ab019ee8e8e026c5e5216be37183975a07e62d",
+    "dem_A_02.tif": "db923336df2cb26f08fdfbfac8f07441766ee46b4bfa759ea7b7a19257a71d61",
+    "dem_A_03.tif": "3a2e95810aeb92995eb11af570c0242e4104e3e9be5695d7a99b48dea08899c0",
+    "dem_B_01.tif": "e4e0bed01eaddaa924ac10e1f1b9e64f9da16242ece43c4035f7f42131412271",
+    "dem_B_02.tif": "dbe29823a071a46eac0910169c65d5b3e7fc82bbc6fde8b5d9861ae91119298a",
+    "dem_B_03.tif": "600bcb84cee6a053f7e2035c4304fe85f4f1587dcf5770f64b78c32c801b7715",
+    "A_01.tif": "711eadda9c799241650030cedfed10d7fc0343434236fab3354c3c521d9c08d6",
+    "A_02.tif": "85efabb394c966cf1b40b0b43c04e2d9ba5d3a40f2d4e834306ea8d222230f80",
+    "A_03.tif": "227fea44179caef6fd36ab05e82c779fc94ca4d09ef53489991a88f016474d20",
+    "B_01.tif": "e5802ff88b91adbdce0e7ddbc26ba10ca20740fb4904f28f64f50edd740bbbd7",
+    "B_02.tif": "c3473e98dc4381552fdad21dc9848b96a11868fb5e31e60c92484269efd93a05",
+    "B_03.tif": "60c542e58e62bd075c0bc1484ff236b5671e31e58eed2c5a2fad5e85543e980a"
+  },
+  "asset_hashes": {
+    "mesh.npz": "c24a70ad364195df4000adcebdbafcf536749513f8283d352e81a0a047052320",
+    "texture.jpg": "b980ef19de023237487bab5af277623203b8e50a9940de067bb7a03e13842f7c"
+  }
+}

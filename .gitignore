@@ -25,6 +25,7 @@ build/
 .vscode/
 .idea/
 *.log
+models/chronos2/
 
 # Bases de datos locales
 *.db
@@ -36,3 +37,53 @@ build/
 
 # Capturas de configuracion de autenticacion
 **/02_totp_setup.png
+
+# Herramientas y documentos temporales de verificación local
+/tmp/
+
+# Instalaciones y datos privados: ninguna variante de runtime se publica
+/data/
+**/runtime*/
+**/respaldo*/
+**/backups/
+*.gsbackup
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+*.sqlite3-wal
+*.sqlite3-shm
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+.aws/
+.codex/
+.agents/
+.npmrc
+.pypirc
+.netrc
+_netrc
+id_rsa
+id_ed25519
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# Fuentes raster y checkpoints pesados; se publican solo derivados verificados
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.partial
+**/checkpoints/
+**/node_modules/
+**/.venv/
+venv/
+env/
+/prueba_hu106*.csv

@@ -6,6 +6,7 @@ import threading
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     MetaData,
     Table,
@@ -27,6 +28,14 @@ metadata = MetaData()
 
 def table(name, *columns):
     return Table(name, metadata, *columns)
+
+
+# Additive D.1 migration: snapshots are versioned, never updated in place.
+workspace_records = table("workspace_records",
+    Column("key", String, primary_key=True), Column("actor", String, nullable=False),
+    Column("kind", String, nullable=False), Column("object_id", String, nullable=False),
+    Column("revision", Integer, nullable=False), Column("payload", String, nullable=False),
+    Column("created_at", String, nullable=False))
 
 
 roles = table("roles", Column("name", String, primary_key=True))
@@ -154,13 +163,21 @@ class Store:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         self.engine = create_engine(
-            "sqlite:///" + str(self.path), connect_args={"check_same_thread": False, "timeout": 20}
+            "sqlite:///" + str(self.path),
+            connect_args={"check_same_thread": False, "timeout": 20},
+            # Returning a connection must also close its SQLite handle. Containers
+            # may outlive a rerun, but should not retain idle file connections.
+            poolclass=NullPool,
         )
 
         @event.listens_for(self.engine, "connect")
         def pragmas(connection, _):
-            connection.execute("PRAGMA foreign_keys=ON")
-            connection.execute("PRAGMA journal_mode=WAL")
+            cursor = connection.cursor()
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA journal_mode=WAL")
+            finally:
+                cursor.close()
 
         metadata.create_all(self.engine)
         with self.tx() as c:

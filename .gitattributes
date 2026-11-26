@@ -1,0 +1,9 @@
+assets/three_component/** text eol=lf
+# Generated third-party GLSL contains intentional whitespace; verify exact bundle hashes instead.
+assets/three_component/bundle/assets/*.js -whitespace linguist-generated=true
+ci_artifacts/** -text
+*.npz binary
+*.jpg binary
+*.png binary
+*.pdf binary
+*.joblib binary

@@ -1,0 +1,23 @@
+# Registro de revisión de escenarios · esquema v1
+
+Esta fase crea `scenario_reviews.db` dentro del runtime configurado, solo al guardar una decisión autorizada. No agrega tablas, columnas, migraciones ni dictámenes al SQLite histórico. La consulta de una base inexistente devuelve una bandeja vacía sin crear archivos. No se migraron ni inspeccionaron bases privadas durante el desarrollo; las pruebas utilizan rutas temporales.
+
+La inicialización reconoce exclusivamente una base vacía (`PRAGMA user_version=0`, sin tablas) y crea v1, o abre v1 existente. Una versión desconocida o una base ajena se rechazan antes de modificar su esquema. Reiniciar/reabrir v1 es idempotente.
+
+Cada entrada guarda UUID, usuario autorizado, escenario, SHA256 de datos, ID de contexto, versión incremental, fecha UTC y payload. El contexto contiene prisma, corte, versión del modelo y huella del análisis. La clave única `(actor, context, version)` y `BEGIN IMMEDIATE` protegen cambios concurrentes. Una versión esperada obsoleta se rechaza. No se actualizan ni borran filas: triggers append-only conservan decisiones anteriores.
+
+Autorización: lectura/escritura exige permiso `review`; exportación exige `export` y consulta únicamente decisiones del usuario actual. El administrador tampoco recibe revisiones de otros usuarios por esta vía. Antes de escribir se mantiene el guard de autenticación existente dentro de su transacción; el orden de locks es autenticación → registro de escenario. No hay claves foráneas entre bases ni promesa de transacción distribuida entre ambas. La decisión válida es la fila append-only del nuevo registro.
+
+La huella de datos incluye columnas, identidades, fechas, magnitudes, coordenadas y metadatos presentes, ordenadas de forma estable. Cambiar datos aísla revisiones anteriores; volver a la misma versión recupera las del propio usuario. Cambiar prisma/corte/modelo/análisis crea un contexto nuevo. Un score o un estado sintético no genera una decisión humana automáticamente.
+
+Las conexiones usan NullPool y cierran al terminar cada operación, incluso ante error. Los archivos nuevos se crean con modo 0600 en plataformas POSIX; Windows conserva las ACL del directorio privado del runtime. Las rutas de runtime y `*.db` ya están ignoradas por Git. No se guardan tokens, secretos, contraseñas, CSV completos ni pesos en este registro. Los comentarios y referencias son datos privados de revisión.
+
+Desde Fase D.1, el sobre cifrado de esquema 1 añade `scenario_reviews` y la tabla principal `workspace_records`. Los backups anteriores, sin estos campos, siguen aceptándose y preservan los registros nuevos que no contienen. La restauración actual utiliza SQLite ATTACH y la misma transacción para añadir revisiones faltantes y recuperar las tablas principales. No modifica ni borra revisiones append-only existentes. El guardado ordinario de decisiones mantiene sus transacciones originales separadas.
+
+`workspace_records` es una migración aditiva del SQLite principal: contiene UUID, propietario, tipo de registro, revisión, fecha y payload JSON. Los escenarios guardan mediciones completas y resultados existentes, sin pickle ni ejecución al deserializar. El codec de DataFrame conserva tipos, fechas y precisión float64 necesaria para mantener la huella de datos. Los reportes contienen una copia independiente de la evidencia y conclusiones; la clave por usuario/solicitud evita duplicados y las nuevas versiones enlazan al reporte anterior. No se guardan secretos de autenticación en estos payloads.
+
+Las pruebas cubren reapertura, versionado, conflicto, roles/sesión inválida, aislamiento por usuario/datos/escenario, inmutabilidad y rechazo de esquemas desconocidos. No se utiliza una exclusión de cobertura para este módulo.
+
+El ajuste de experiencia de D.1 concentra detalle y descargas HTML/JSON/PDF en el historial. El servicio devuelve el JSON efectivamente persistido, normalizado y separado de los objetos de entrada, para que modificar un resultado en memoria no altere una edición devuelta. Guardar confirma primero la transacción y después limpia el borrador y los filtros, abre el historial y selecciona el nuevo código; el error conserva el formulario. La migración aditiva se comprueba simulando un esquema anterior en una base temporal y comparando cuentas y dictámenes históricos antes/después. Los respaldos y restauraciones también se prueban exclusivamente en runtimes temporales.
+
+Estas garantías requieren que se conserve el almacenamiento de la instalación. No garantizan persistencia en un filesystem efímero de Render; véase [instalación](manual_instalacion.md#persistencia-local-y-render).

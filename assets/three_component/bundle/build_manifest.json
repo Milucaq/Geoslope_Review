@@ -1,0 +1,17 @@
+{
+  "files": {
+    "LICENSE_THREE.txt": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+    "assets/index-BDGUOKl3.js": "2c44d7a2b4916fccbf606cfa3e3ed46a8308c34dd4b11143b0babce94591e934",
+    "index.html": "5a1b0bc672c7b1afa03a58f1199de7535cc98af5b4ebe321668589dd9033b403"
+  },
+  "schema": 1,
+  "sources": {
+    "index.html": "2f2a1675dfc9e69f0a286a0d50c34b72ef2f82bd121892f45c42f254a4c0af05",
+    "package-lock.json": "78e4e865f676ae5fd2f94c5b469a88db15883548ab10e6c7e626b743bc998a1a",
+    "package.json": "dc243876957c51890b2a676ae0026bd9990a0ce0d8a04dda25bacff047a146d4",
+    "public/LICENSE_THREE.txt": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+    "src/instrumental.js": "5cb2a0d123bcde2db5f36be4a34e51b82277947a3c869f57efd0c2941e2b6dc7",
+    "src/john_henry.js": "164f96ebd30804ab630cd55a62c043ba227fc0263c16551a10aa01199f437ee7",
+    "src/main.js": "03898dcd1330fcf1168106a8b505a72117ae630750d0fe288597259a3be8c606"
+  }
+}

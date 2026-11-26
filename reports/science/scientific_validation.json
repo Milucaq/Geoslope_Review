@@ -1,0 +1,83 @@
+{
+  "isolation": {
+    "rows": 7178,
+    "features": 17,
+    "max_feature_absolute_error": 5.684341886080802e-14,
+    "max_score_absolute_error": 1.1102230246251565e-16,
+    "rtol": 1e-12,
+    "atol": 1e-12,
+    "eligibility_and_q99_marks_exact": true
+  },
+  "experiment": "synthetic functionality only; not field validation",
+  "seed": 42,
+  "prism": "SYN-W01",
+  "days": 45,
+  "cadence_hours": 6,
+  "chronos": [
+    {
+      "hours": 24,
+      "model_id": "amazon/chronos-2",
+      "revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+      "versions": {
+        "chronos-forecasting": "2.3.2",
+        "torch": "2.9.1+cpu",
+        "transformers": "4.57.6",
+        "accelerate": "1.16.0",
+        "einops": "0.8.2",
+        "numpy": "2.3.5",
+        "pandas": "2.2.3"
+      },
+      "device": "cpu",
+      "load_seconds": 0.18477189913392067,
+      "elapsed_seconds": 0.6858486998826265,
+      "rss_mb": 772.6953125,
+      "peak_working_set_mb": 772.6953125,
+      "context_limit": 2048,
+      "worker_wall_seconds": 13.228013399988413
+    },
+    {
+      "hours": 72,
+      "model_id": "amazon/chronos-2",
+      "revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+      "versions": {
+        "chronos-forecasting": "2.3.2",
+        "torch": "2.9.1+cpu",
+        "transformers": "4.57.6",
+        "accelerate": "1.16.0",
+        "einops": "0.8.2",
+        "numpy": "2.3.5",
+        "pandas": "2.2.3"
+      },
+      "device": "cpu",
+      "load_seconds": 0.25137029960751534,
+      "elapsed_seconds": 0.7138167005032301,
+      "rss_mb": 772.50390625,
+      "peak_working_set_mb": 772.50390625,
+      "context_limit": 2048,
+      "worker_wall_seconds": 13.289641899988055
+    },
+    {
+      "hours": 168,
+      "model_id": "amazon/chronos-2",
+      "revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+      "versions": {
+        "chronos-forecasting": "2.3.2",
+        "torch": "2.9.1+cpu",
+        "transformers": "4.57.6",
+        "accelerate": "1.16.0",
+        "einops": "0.8.2",
+        "numpy": "2.3.5",
+        "pandas": "2.2.3"
+      },
+      "device": "cpu",
+      "load_seconds": 0.2528276015073061,
+      "elapsed_seconds": 0.7257242016494274,
+      "rss_mb": 773.48828125,
+      "peak_working_set_mb": 773.48828125,
+      "context_limit": 2048,
+      "worker_wall_seconds": 14.833543898537755
+    }
+  ],
+  "historical_forecast_status": "blocked: Frecuencia irregular: pron\u00f3stico bloqueado. No se interpola ni se rellena la serie.",
+  "frozen_artifacts_after": 17
+}
