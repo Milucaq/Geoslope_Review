@@ -1,0 +1,12 @@
+{
+  "model_id": "amazon/chronos-2",
+  "revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+  "license": "Apache-2.0",
+  "package": "chronos-forecasting",
+  "package_version": "2.3.2",
+  "quantiles": [0.1, 0.5, 0.9],
+  "horizons_hours": [24, 72, 168],
+  "context_limit": 2048,
+  "prediction_limit": 1024,
+  "runtime": "optional isolated CPU worker; never automatic download in app"
+}

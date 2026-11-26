@@ -12,6 +12,9 @@ from gsreview.application.reports import ReportService
 from gsreview.application.backup import BackupService
 from gsreview.application.settings import SettingsService
 from gsreview.application.synthetic import SyntheticService
+from gsreview.application.science import ScienceService
+from gsreview.application.scenario_review import ScenarioReviewService
+from gsreview.application.persistence import PersistenceService
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 
@@ -28,7 +31,7 @@ class Container:
         self.runtime = Path(
             runtime or os.environ.get("GEOSLOPE_RUNTIME", APP_ROOT / "data/runtime")
         ).resolve()
-        self.brand = yaml.safe_load((APP_ROOT / "config/app_config.yaml").read_text())
+        self.brand = yaml.safe_load((APP_ROOT / "config/app_config.yaml").read_text(encoding="utf-8"))
         self.store = Store(self.runtime / "geoslope_review.db")
         self.cipher = LocalCipher(
             os.environ.get("GEOSLOPE_KEY_FILE", str(self.runtime / "master.key"))
@@ -41,3 +44,6 @@ class Container:
         self.backups = BackupService(self.auth, self.reader, self.runtime / "backups")
         self.settings = SettingsService(self.auth)
         self.synthetic = SyntheticService(self.auth)
+        self.science = ScienceService(self.auth, self.reader)
+        self.scenario_reviews = ScenarioReviewService(self.auth, self.runtime / "scenario_reviews.db")
+        self.persistence = PersistenceService(self.auth)

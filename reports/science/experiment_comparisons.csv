@@ -1,0 +1,7 @@
+horizon_hours,reference,chronos_lower_mae,chronos_lower_rmse,chronos_closer_to_80pct
+24,persistence,True,True,True
+24,linear,True,True,True
+72,persistence,True,True,True
+72,linear,True,True,True
+168,persistence,True,True,True
+168,linear,True,True,True

@@ -41,7 +41,7 @@ jobs:
       - name: Instalar linter Ruff
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ruff
+          python -m pip install ruff==0.16.10
 
       - name: Ejecutar análisis estático de estilo y sintaxis
         run: |
@@ -64,7 +64,7 @@ jobs:
           fi
 
   security-audit:
-    name: 2. Seguridad y Librerías (Bandit & pip-audit)
+    name: 2. Seguridad de producción (Bandit & pip-audit)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -98,12 +98,8 @@ jobs:
           fi
 
           echo "=== [2/4] Verificando ausencia de secretos y archivos prohibidos en Git ==="
-          forbidden=$(git ls-files | grep -E '(\.env$|\.sqlite3$|\.db$|\.gsbackup$|\.pem$|\.key$)' || true)
-          if [ -n "$forbidden" ]; then
-            echo "::error::Archivos sensibles o bases de datos locales versionadas en Git: $forbidden"
+          if ! python scripts/audit_release.py --json release-audit.json; then
             errors=$((errors + 1))
-          else
-            echo "Higiene de repositorio verificada: sin secretos ni bases de datos expuestas."
           fi
 
           echo "=== [3/4] Análisis estático de seguridad SAST (Bandit) ==="
@@ -114,8 +110,8 @@ jobs:
           fi
 
           echo "=== [4/4] Auditoría de vulnerabilidades en librerías (pip-audit) ==="
-          python -m pip_audit -r requirements.txt -f json -o pip-audit-report.json || true
-          if ! python -m pip_audit -r requirements.txt; then
+          python -m pip_audit --strict -r requirements.txt -f json -o pip-audit-report.json || true
+          if ! python -m pip_audit --strict -r requirements.txt; then
             echo "::error::pip-audit detectó vulnerabilidades conocidas (CVE) en las librerías."
             errors=$((errors + 1))
           fi
@@ -133,6 +129,21 @@ jobs:
           path: |
             bandit-report.json
             pip-audit-report.json
+            release-audit.json
+          if-no-files-found: warn
+
+      - name: Informar auditoría del worker experimental sin instalar pesos
+        if: always()
+        run: |
+          if ! python -m pip_audit --no-deps --disable-pip -r requirements-chronos-lock.txt -f json -o chronos-audit.json; then
+            echo "::warning::El worker opcional conserva avisos pendientes. No está instalado ni habilitado en Render; requiere actualización y revalidación antes de producción."
+          fi
+      - name: Conservar auditoría del worker opcional
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoslope-optional-worker-audit
+          path: chronos-audit.json
           if-no-files-found: warn
 
   artifact-integrity:
@@ -161,9 +172,39 @@ jobs:
 
       - name: Verificar integridad criptográfica de artefactos congelados
         run: |
-          mkdir -p ../config ../data/processed ../models ../reports
-          cp -a ci_artifacts/. ../
           python scripts/verify_integrity.py
+
+  frontend-assets:
+    name: Bundle Three.js y arranque limpio Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: assets/three_component/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Reconstruir bundle sin checkpoints ni raster original
+        working-directory: assets/three_component
+        run: |
+          npm ci --ignore-scripts --no-fund
+          npm run build
+          npm audit
+      - name: Verificar bundle versionado y procedencia
+        run: |
+          python scripts/verify_release_assets.py --write-bundle-manifest
+          git diff --exit-code -- assets/three_component/bundle
+      - name: Arranque frío con runtime temporal y Chronos deshabilitado
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python scripts/verify_clean_start.py
 
   unit-domain-tests:
     name: 4. Pruebas Unitarias, Dominio y Seguridad
@@ -193,11 +234,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
           python -m pip install -e .
-
-      - name: Preparar artefactos originales
-        run: |
-          mkdir -p ../config ../data/processed ../models ../reports
-          cp -a ci_artifacts/. ../
 
       - name: Ejecutar pruebas unitarias, criptográficas y de datos
         run: |
@@ -239,8 +275,6 @@ jobs:
 
       - name: Preparar artefactos originales
         run: |
-          mkdir -p ../config ../data/processed ../models ../reports
-          cp -a ci_artifacts/. ../
           python scripts/verify_integrity.py
 
       - name: Ejecutar suite integral y validar umbral de cobertura
@@ -270,6 +304,7 @@ jobs:
       - artifact-integrity
       - unit-domain-tests
       - integration-coverage
+      - frontend-assets
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -280,6 +315,7 @@ jobs:
       RES_INTEGRITY: ${{ needs.artifact-integrity.result }}
       RES_UNIT: ${{ needs.unit-domain-tests.result }}
       RES_INTEGRATION: ${{ needs.integration-coverage.result }}
+      RES_FRONTEND: ${{ needs.frontend-assets.result }}
 
     steps:
       - name: Consolidar resultados y publicar resumen ejecutivo
@@ -298,10 +334,11 @@ jobs:
             echo "| Etapa del Pipeline | Herramientas / Alcance | Estado |"
             echo "| :--- | :--- | :---: |"
             echo "| **1. Calidad y Estilo** | Ruff Linter + Compilación de sintaxis Python | $(badge "$RES_QUALITY") |"
-            echo "| **2. Seguridad y Librerías** | Bandit (SAST) + pip-audit (SCA) + pip check + Higiene Git | $(badge "$RES_SECURITY") |"
+            echo "| **2. Seguridad de producción** | Bandit (SAST) + pip-audit (SCA) + pip check + Higiene Git | $(badge "$RES_SECURITY") |"
             echo "| **3. Integridad Criptográfica** | Verificación SHA-256 de 17 artefactos congelados | $(badge "$RES_INTEGRITY") |"
             echo "| **4. Pruebas Unitarias y Dominio** | Seguridad Argon2id/AES-GCM/TOTP, CSV, Sintéticos y Tema | $(badge "$RES_UNIT") |"
             echo "| **5. Integración, UI y Cobertura** | Suite completa Pytest + AppTest + Cobertura >= 90% | $(badge "$RES_INTEGRATION") |"
+            echo "| **6. Recursos y Linux** | Bundle reproducible, activos optimizados, arranque temporal sin Chronos | $(badge "$RES_FRONTEND") |"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -311,7 +348,8 @@ jobs:
             "2. Seguridad y Librerías:$RES_SECURITY" \
             "3. Integridad de Artefactos:$RES_INTEGRITY" \
             "4. Pruebas Unitarias y Dominio:$RES_UNIT" \
-            "5. Integración, UI y Cobertura:$RES_INTEGRATION"; do
+            "5. Integración, UI y Cobertura:$RES_INTEGRATION" \
+            "6. Recursos y Linux:$RES_FRONTEND"; do
             stage="${pair%%:*}"
             status="${pair##*:}"
             if [ "$status" != "success" ]; then
@@ -328,5 +366,5 @@ jobs:
             exit 1
           else
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "> ✅ **Resultado Global:** Todas las etapas de calidad, seguridad, integridad y cobertura finalizaron exitosamente." >> "$GITHUB_STEP_SUMMARY"
+            echo "> ✅ **Resultado Global:** Las compuertas del entorno web finalizaron exitosamente. El worker opcional tiene una auditoría separada y no está habilitado en Render." >> "$GITHUB_STEP_SUMMARY"
           fi

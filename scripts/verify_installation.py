@@ -1,5 +1,6 @@
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -25,7 +26,8 @@ if __name__ == "__main__":
     )
     for module in modules:
         importlib.import_module(module)
-    reader = FrozenReader(APP_ROOT.parent, APP_ROOT / "config/frozen_manifest.json")
+    source = Path(os.environ.get("GEOSLOPE_SOURCE", APP_ROOT / "ci_artifacts"))
+    reader = FrozenReader(source, APP_ROOT / "config/frozen_manifest.json")
     print(
         json.dumps(
             {

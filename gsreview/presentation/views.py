@@ -1,6 +1,7 @@
 """Vistas sin SQL: cada operación utiliza servicios de aplicación autorizados."""
 
 import json
+import hashlib
 from html import escape
 
 import pandas as pd
@@ -137,12 +138,6 @@ def login(c):
             if enroll
             else "Introduce el código de tu autenticador para terminar de ingresar."
         )
-        (
-            "Paso 3 de 3 · Segundo factor"
-            if st.session_state.get("setup_flow")
-            else "Paso 2 de 2 · " + ("Segundo factor" if enroll else "Verificación en dos pasos")
-        )
-
     elif needs_setup:
         title = "Crea el administrador" if key_ok else "Activa tu instalación"
         subtitle = (
@@ -155,8 +150,6 @@ def login(c):
             "Bienvenido",
             "Ingresa con tu usuario y contraseña para acceder a la plataforma.",
         )
-
-        
 
     with st.container(key="gs_login_root"):
         st.markdown(login_css(), unsafe_allow_html=True)
@@ -822,6 +815,14 @@ def quality_view(c, token):
                 st.metric("Registros importados para vista previa", len(validated_data))
                 st.metric("Prismas identificados", validated_data["prism_id"].nunique())
                 st.dataframe(validated_data.head(100), hide_index=True)
+                from gsreview.application.scenarios import activate_external
+
+                st.button(
+                    "Usar como escenario externo", key="activate_external_csv",
+                    on_click=activate_external, args=(st.session_state, validated_data,
+                        {"filename": getattr(uploaded_csv, "name", "CSV externo"),
+                         "source_sha256": hashlib.sha256(content).hexdigest(), "validation": "CSV structure only"}),
+                )
                 st.info(
                     "Vista previa únicamente. Los registros no se han guardado "
                     "ni incorporado al análisis histórico."

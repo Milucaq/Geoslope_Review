@@ -117,9 +117,19 @@ def render_terrain(c, dimension):
         revision = (
             f"terrain-{dimension}-{exaggeration}-{st.session_state.get('sx_terrain_revision', 0)}"
         )
-        figure = terrain_figure(arrays, dimension, exaggeration)
-        figure.update_layout(uirevision=revision)
-        render_scene(figure, revision, key="terrain_scene")
+        engine = "Plotly"
+        if dimension == "3D":
+            engine = st.radio("Motor 3D", ["Plotly", "Three.js"], horizontal=True,
+                              key="sx_terrain_engine")
+        rendered = False
+        if engine == "Three.js":
+            from gsreview.presentation.three_component import render_three_terrain
+
+            rendered = render_three_terrain(arrays, exaggeration, revision)
+        if not rendered:
+            figure = terrain_figure(arrays, dimension, exaggeration)
+            figure.update_layout(uirevision=revision)
+            render_scene(figure, revision, key="terrain_scene")
     st.caption(
         "Superficie satelital con referencia propia: WGS84 / UTM 54S y cotas EGM2008. "
         "No es un levantamiento detallado del talud ni una captura exacta de 2014. "
@@ -127,13 +137,15 @@ def render_terrain(c, dimension):
     )
     with st.expander("Fuente y archivo de relieve"):
         st.caption(metadata["attribution"])
-        st.download_button(
-            "Descargar GeoTIFF",
-            (c.app_root / "assets/terrain/century_copernicus_dsm_30m.tif").read_bytes(),
-            file_name="century_copernicus_dsm_30m.tif",
-            mime="image/tiff",
-            key="sx_terrain_download",
-        )
+        raster = c.app_root / "assets/terrain/century_copernicus_dsm_30m.tif"
+        if raster.is_file():
+            st.download_button(
+                "Descargar GeoTIFF", raster.read_bytes(), file_name=raster.name,
+                mime="image/tiff", key="sx_terrain_download",
+            )
+        else:
+            st.caption("El GeoTIFF original no se distribuye en este release. La vista usa la malla "
+                       "optimizada verificada; los enlaces de procedencia se conservan en sus metadatos.")
         st.caption(
             "La georreferencia local y el datum vertical de los prismas deben confirmarse "
             "antes de superponerlos sobre esta superficie."

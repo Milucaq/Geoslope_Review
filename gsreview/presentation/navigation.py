@@ -92,6 +92,7 @@ def _initials(name):
 
 def render_navigation(c, token, actor):
     choices = permitted_pages(c, token)
+    nav_scenario = st.session_state.get("scenario_selector") or st.session_state.get("active_scenario", "historical")
     page = st.session_state.get("current_page", st.session_state.get("nav", choices[0]))
     if page not in choices:
         page = choices[0]
@@ -119,14 +120,19 @@ def render_navigation(c, token, actor):
                         theme.html(theme.sidebar_group(last_group))
                     with st.container(key="rail_" + str(i)):
                         st.button(
-                            label,
+                            "Análisis" if destination == "Prismas" and nav_scenario != "historical" else label,
                             key="rail_" + destination,
                             type="primary" if destination == page else "secondary",
                             width="stretch",
                             on_click=navigate,
                             args=(destination,),
                         )
-            theme.html(theme.sidebar_context())
+            site, policy = {
+                "historical": ("West Wall", "Caso histórico de referencia"),
+                "external": ("CSV externo", "Referencia espacial por validar"),
+                "john_henry": ("John Henry Mine", "Instrumentación sintética · análisis separado"),
+            }.get(nav_scenario, ("Escenario", "Referencia por validar"))
+            theme.html(theme.sidebar_context(site, policy))
             with st.container(key="rail_identity"):
                 role = "Administrador" if actor["role"] == "administrador" else "Ingeniero"
                 with st.container(key="rail_profile"):

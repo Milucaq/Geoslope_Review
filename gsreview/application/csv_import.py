@@ -147,7 +147,15 @@ def validate_csv(
             f"El archivo supera el límite máximo permitido de {MAX_ROWS} registros."
         )
 
-    frame = frame.loc[:, REQUIRED_COLUMNS].copy()
+    optional = ["reported_3d_movement_mm"] if "reported_3d_movement_mm" in frame else []
+    frame = frame.loc[:, list(REQUIRED_COLUMNS) + optional].copy()
+    for column in optional:
+        # Empty scalar measurements remain missing, never reconstructed from rates.
+        raw = frame[column].str.strip()
+        values = pd.to_numeric(raw.mask(raw.eq("")), errors="coerce")
+        if (raw.ne("") & values.isna()).any() or np.isinf(values.to_numpy(float)).any():
+            raise ValidationError("La magnitud escalar reportada debe estar en mm y ser finita o vacía.")
+        frame[column] = values
 
     for column in ("source_record_id", "prism_id"):
         frame[column] = frame[column].str.strip()

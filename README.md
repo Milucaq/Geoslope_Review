@@ -1,6 +1,10 @@
-# GeoSlope Review 0.7.5
+# GeoSlope Review 0.8.0 - candidato de release
 
-Aplicación local offline para revisar anomalías estadísticas de prismas y registrar evaluaciones humanas. Monolito modular con Streamlit, servicios Python, SQLAlchemy y SQLite. Usa los artefactos aprobados de Fases 1–6 ubicados en la carpeta superior; no reentrena modelos ni recalcula resultados.
+Plataforma Streamlit para revisión geotécnica con escenarios históricos, CSV externos y John Henry experimental, detección causal con Isolation Forest verificado y reportes versionados HTML/JSON/PDF. Conserva los 17 artefactos históricos sin reentrenarlos. Un checkout incluye sus fuentes aprobadas en `ci_artifacts/`, las mallas optimizadas y el bundle Three.js, sin necesitar archivos de una carpeta superior ni datos privados.
+
+Chronos-2 es un worker opcional separado: no se instala ni carga en Render Free. Su entorno científico original tiene avisos de seguridad pendientes en Transformers y PyTorch; no debe habilitarse como servicio de producción sin actualizar y revalidar esa combinación. Los resultados sintéticos registrados no se reinterpretan como validación de campo ni predicción de colapso.
+
+Estado del candidato, selección de archivos, pruebas y límites de Render: [preparación de release](docs/releases/0.8.0.md). PR dirigido a `develop`; commit, push y despliegue requieren autorización.
 
 ## Inicio en Windows
 
@@ -29,7 +33,7 @@ Inicio; bandeja y detalle de episodios; vista espacial 2D/3D; prismas; calidad; 
 
 El sidebar permanece compacto (88 px) en todas las pantallas. Inicio → Revisión → Vista espacial → Prismas → Datos → Reportes → Usuarios → Auditoría. La opción activa tiene fondo azul y una línea cyan; los iconos SVG son locales. El menú de usuario inferior abre Mi perfil y, con permiso, Copias de seguridad. Salir cierra la sesión. Los permisos se consultan en el servicio de autorización existente.
 
-Ver [validación del sidebar](reports/phase7/shared_sidebar.md) y las capturas de ambos roles en `reports/phase7/shared_sidebar/`. La entrega registra 281 pruebas aprobadas.
+Ver [validación del sidebar](reports/phase7/shared_sidebar.md) y las capturas de ambos roles en `reports/phase7/shared_sidebar/`. Es evidencia histórica; las cifras actuales se registran en la preparación del release.
 
 ## Vista espacial conservada de 0.7.2
 
@@ -39,7 +43,7 @@ Coordenadas de prismas originales sin unidades/CRS aprobados; no se infiere terr
 
 ## Relieve integrado 0.7.4
 
-En Vista espacial, activa **Mostrar relieve de Century Mine** para cambiar a la superficie real de Copernicus GLO-30. Usa Vista 2D/3D, la cámara, Vista completa y la exageración vertical 1×/3×/5×. Las cotas conservan sus valores y puedes descargar el GeoTIFF desde Fuente y archivo de relieve. Apaga el control para volver a los prismas y su ficha.
+En Vista espacial, activa **Mostrar relieve de Century Mine** para cambiar a la superficie real de Copernicus GLO-30. Usa Vista 2D/3D, la cámara, Vista completa y la exageración vertical 1×/3×/5×. Las cotas conservan sus valores; Fuente y archivo de relieve ofrece el GeoTIFF si existe en la instalación local. El checkout público utiliza la superficie NPZ verificada sin distribuir el raster original. Apaga el control para volver a los prismas y su ficha.
 
 El relieve se distribuye localmente, con resolución aproximada de 30 m. Es una superficie satelital con cotas EGM2008, no un levantamiento detallado del talud ni una captura exacta de 2014. Los filtros instrumentales no cambian esta superficie. La superposición de prismas requiere validar su CRS local, unidades, datum vertical y puntos de control; no se aplicó un desplazamiento arbitrario. No se añaden dependencias geoespaciales a la instalación. Fuente, máscaras de calidad y licencia documentadas en `assets/terrain/`.
 
@@ -64,7 +68,7 @@ La instalación descarga dependencias; la ejecución posterior no necesita inter
 - [Limitaciones](docs/limitaciones.md)
 - [Validación de Fase 7](reports/phase7/validation_report.md)
 
-Pruebas desde la raíz `monitoreo-taludes`: `PYTHONPATH=geoslope_review python -m pytest -q tests geoslope_review/tests`. En Windows usa `$env:PYTHONPATH="geoslope_review"` antes del comando. Ruff se ejecuta desde la subcarpeta de aplicación: `python -m ruff check .`. Las pruebas de navegador son opcionales para desarrolladores; requieren `requirements-dev.txt` y Chromium local: `python scripts/validate_browser.py --chromium RUTA`.
+Desde este checkout instala `requirements-dev.txt` y ejecuta `python -m ruff check .`, `python -m pytest --cov=gsreview --cov-report=term-missing --cov-fail-under=90`, `python scripts/verify_integrity.py` y `python scripts/verify_release_assets.py`. No copies archivos a una carpeta superior. Las pruebas de navegador son opcionales y requieren Chromium local; las pruebas topográficas de CI usan datos pequeños controlados y no descargan el mosaico original.
 
 ## Desarrollo colaborativo y trazabilidad Jira–GitHub
 

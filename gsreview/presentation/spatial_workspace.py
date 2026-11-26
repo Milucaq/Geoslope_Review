@@ -90,19 +90,22 @@ def render_workspace(c, token):
                     st.session_state.clear()
                     st.rerun()
                 st.toggle("Mostrar ficha", key="sx_detail", value=True)
-        source_type = st.radio(
-            "Fuente de datos",
-            ["Datos originales", "Datos externos"],
-            horizontal=True,
-            key="hu110_source_type",
-        )
+        source_type = {
+            "historical": "Datos originales", "external": "Datos externos",
+            "john_henry": "Escenario experimental",
+        }[st.session_state.get("active_scenario", "historical")]
+        st.caption("Fuente de datos: " + source_type + " · seleccionada en el menú de escenarios")
 
         if source_type == "Datos externos":
             from gsreview.presentation.external_spatial_workspace import (
                 render_external_workspace,
             )
 
-            render_external_workspace()
+            render_external_workspace(c, token)
+        elif source_type == "Escenario experimental":
+            from gsreview.presentation.john_henry_workspace import render_john_henry_workspace
+
+            render_john_henry_workspace(c, token)
         else:
             _render_body(c, token)
 
@@ -283,9 +286,25 @@ def _render_content(c, token):
             )
             if dimension == "3D" and not st.session_state.get("sx_focus", False):
                 figure.update_layout(scene_camera={"eye": {"x": 1.4, "y": 1.4, "z": 1.1}})
-            event = render_scene(
-                figure, str(st.session_state.get("sx_camera_revision", 0)) + dimension
-            )
+            engine = "Plotly"
+            if dimension == "3D":
+                engine = st.radio("Motor 3D de prismas", ["Plotly", "Three.js"],
+                                  horizontal=True, key="sx_prism_engine")
+            if engine == "Three.js":
+                from gsreview.presentation.three_component import render_three_instrumental
+
+                surface = st.toggle("Superficie TIN experimental", value=True,
+                                    key="sx_instrumental_tin")
+                st.caption("Interpolación geométrica de prismas, no levantamiento topográfico ni mapa de riesgo. "
+                           "Se omiten sitios duplicados y aristas mayores a tres veces la mediana "
+                           "de distancia al vecino más próximo. Los filtros no reconstruyen la malla.")
+                event = render_three_instrumental(
+                    points, visible, selected, labels, st.session_state.get("sx_focus", False),
+                    surface, f"{day}-{st.session_state.get('sx_camera_revision', 0)}")
+            else:
+                event = render_scene(
+                    figure, str(st.session_state.get("sx_camera_revision", 0)) + dimension
+                )
             selection = accept_selection(event, valid_ids, st.session_state.get("sx_last_nonce"))
             if selection:
                 st.session_state.sx_pending_selection, _, st.session_state.sx_last_nonce = selection

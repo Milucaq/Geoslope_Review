@@ -134,7 +134,7 @@ def header_html(brand: str, title: str, subtitle: str) -> str:
         f'<rect width="32" height="32" rx="9" fill="url(#gsMark)"/>'
         f'<path d="M6 11h20M9 16h14M12 21h8" stroke="{BG}" stroke-width="2.4" stroke-linecap="round"/></svg>'
     )
-  
+
     return _flat(
         f"""<div class="gs-head">
 <div class="gs-brand">{mark}<span>{brand}</span></div>
